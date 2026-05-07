@@ -1,16 +1,50 @@
 import { useState, useEffect } from 'react';
-import { Smartphone, Trash2, RefreshCw } from 'lucide-react';
+import {
+  Smartphone,
+  Battery,
+  BatteryLow,
+  BatteryMedium,
+  BatteryFull,
+  Wifi,
+  WifiOff,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+  Trash2,
+  RefreshCw
+} from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../services/api';
-import type { Device } from '../types';
+import firebase from '../services/firebase';
+
+interface Device {
+  id: string;
+  userId: string;
+  email: string;
+  fcmToken: string;
+  deviceModel?: string;
+  osVersion?: string;
+  appVersion?: string;
+  batteryLevel?: number;
+  isCharging?: boolean;
+  lastSeen: number;
+  registeredAt: number;
+  isOnline?: boolean;
+}
 
 export default function Devices() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadDevices();
+
+    // Subscribe to real-time device updates
+    const unsubscribe = firebase.onDevicesChange?.((updatedDevices) => {
+      setDevices(updatedDevices);
+    });
+
+    return () => unsubscribe?.();
   }, []);
 
   const loadDevices = async () => {
@@ -26,21 +60,92 @@ export default function Devices() {
     }
   };
 
-  const handleUnregister = async (deviceId: string) => {
+  const handleDeleteDevice = async (deviceId: string) => {
     if (!confirm('Are you sure you want to unregister this device?')) {
       return;
     }
 
     try {
-      setIsDeletingId(deviceId);
       await api.unregisterDevice(deviceId);
       toast.success('Device unregistered successfully');
-      await loadDevices();
+      loadDevices();
     } catch (error) {
-      console.error('Failed to unregister device:', error);
+      console.error('Failed to delete device:', error);
       toast.error('Failed to unregister device');
-    } finally {
-      setIsDeletingId(null);
+    }
+  };
+
+  const handleTestDevice = async (device: Device) => {
+    try {
+      await api.sendTestAlert({
+        title: 'Device Test',
+        message: `Testing notification delivery to ${device.deviceModel || 'device'}`,
+        severity: 'INFO',
+        channelId: 'test',
+        channelName: 'Test',
+      });
+      toast.success(`Test alert sent to ${device.email}`);
+    } catch (error) {
+      console.error('Failed to test device:', error);
+      toast.error('Failed to send test alert');
+    }
+  };
+
+  const getBatteryIcon = (level?: number, isCharging?: boolean) => {
+    if (!level) return Battery;
+
+    if (isCharging) {
+      return BatteryFull;
+    }
+
+    if (level < 20) {
+      return BatteryLow;
+    } else if (level < 50) {
+      return BatteryMedium;
+    } else {
+      return BatteryFull;
+    }
+  };
+
+  const getBatteryColor = (level?: number) => {
+    if (!level) return 'text-gray-400';
+
+    if (level < 20) {
+      return 'text-red-600';
+    } else if (level < 50) {
+      return 'text-orange-500';
+    } else {
+      return 'text-green-600';
+    }
+  };
+
+  const getOnlineStatus = (lastSeen: number) => {
+    const minutesSinceLastSeen = (Date.now() - lastSeen) / 1000 / 60;
+
+    if (minutesSinceLastSeen < 5) {
+      return { status: 'online', color: 'bg-green-500', text: 'Online' };
+    } else if (minutesSinceLastSeen < 30) {
+      return { status: 'away', color: 'bg-yellow-500', text: 'Away' };
+    } else {
+      return { status: 'offline', color: 'bg-gray-400', text: 'Offline' };
+    }
+  };
+
+  const getLastSeenText = (lastSeen: number) => {
+    const minutesAgo = Math.floor((Date.now() - lastSeen) / 1000 / 60);
+
+    if (minutesAgo < 1) {
+      return 'Just now';
+    } else if (minutesAgo < 60) {
+      return `${minutesAgo} minute${minutesAgo !== 1 ? 's' : ''} ago`;
+    } else {
+      const hoursAgo = Math.floor(minutesAgo / 60);
+      if (hoursAgo < 24) {
+        return `${hoursAgo} hour${hoursAgo !== 1 ? 's' : ''} ago`;
+      } else {
+        const daysAgo = Math.floor(hoursAgo / 24);
+        return `${daysAgo} day${daysAgo !== 1 ? 's' : ''} ago`;
+      }
     }
   };
 
@@ -48,8 +153,8 @@ export default function Devices() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading devices...</p>
+          <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto shadow-sm"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading devices...</p>
         </div>
       </div>
     );
@@ -60,111 +165,198 @@ export default function Devices() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Devices</h1>
-          <p className="text-gray-600 mt-2">Manage registered Android devices</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Devices</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Manage registered devices and monitor their health
+          </p>
         </div>
-        <button onClick={loadDevices} className="btn-secondary flex items-center gap-2">
+        <button
+          onClick={loadDevices}
+          className="btn-secondary flex items-center gap-2"
+        >
           <RefreshCw className="w-4 h-4" />
           Refresh
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="card">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
-            <Smartphone className="w-6 h-6 text-primary-600" />
+      {/* Stats cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Devices</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{devices.length}</p>
+            </div>
+            <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900 rounded-lg flex items-center justify-center">
+              <Smartphone className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+            </div>
           </div>
-          <div>
-            <p className="text-sm text-gray-600">Total Registered Devices</p>
-            <p className="text-2xl font-bold text-gray-900">{devices.length}</p>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Online Now</p>
+              <p className="text-3xl font-bold text-green-600 dark:text-green-500">
+                {devices.filter(d => getOnlineStatus(d.lastSeen).status === 'online').length}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+              <Wifi className="w-6 h-6 text-green-600 dark:text-green-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Low Battery</p>
+              <p className="text-3xl font-bold text-orange-600 dark:text-orange-500">
+                {devices.filter(d => d.batteryLevel && d.batteryLevel < 20).length}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
+              <BatteryLow className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Devices table */}
+      {/* Device list */}
       <div className="card">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Registered Devices</h2>
+
         {devices.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <Smartphone className="w-12 h-12 mx-auto mb-3 text-gray-400" />
             <p>No devices registered yet</p>
-            <p className="text-sm mt-2">Devices will appear here when users log in to the mobile app</p>
+            <p className="text-sm mt-2">Devices will appear here once users log in to the mobile app</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Email</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Device ID</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">FCM Token</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Registered</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Last Seen</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {devices.map((device) => (
-                  <tr
-                    key={device.deviceId}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="py-3 px-4">
-                      <p className="font-medium text-gray-900">{device.email}</p>
-                    </td>
-                    <td className="py-3 px-4">
-                      <p className="text-sm text-gray-600 font-mono">{device.deviceId.slice(0, 16)}...</p>
-                    </td>
-                    <td className="py-3 px-4">
-                      <p className="text-sm text-gray-600 font-mono max-w-xs truncate">
-                        {device.fcmToken.slice(0, 24)}...
+          <div className="space-y-3">
+            {devices.map((device) => {
+              const onlineStatus = getOnlineStatus(device.lastSeen);
+              const BatteryIcon = getBatteryIcon(device.batteryLevel, device.isCharging);
+              const batteryColor = getBatteryColor(device.batteryLevel);
+
+              return (
+                <div
+                  key={device.id}
+                  className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-surface transition-colors"
+                >
+                  {/* Device icon */}
+                  <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Smartphone className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                  </div>
+
+                  {/* Device info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-semibold text-gray-900 dark:text-white truncate">
+                            {device.email}
+                          </p>
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${onlineStatus.color}`}></span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {onlineStatus.text}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                          {device.deviceModel && (
+                            <span className="flex items-center gap-1">
+                              <Smartphone className="w-3 h-3" />
+                              {device.deviceModel}
+                            </span>
+                          )}
+                          {device.osVersion && (
+                            <span>OS: {device.osVersion}</span>
+                          )}
+                          {device.appVersion && (
+                            <span>App: v{device.appVersion}</span>
+                          )}
+                        </div>
+
+                        {/* Health indicators */}
+                        <div className="flex flex-wrap items-center gap-4 mt-3">
+                          {/* Battery */}
+                          {device.batteryLevel !== undefined && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <BatteryIcon className={`w-4 h-4 ${batteryColor}`} />
+                              <span className={batteryColor}>
+                                {device.batteryLevel}%
+                                {device.isCharging && ' (Charging)'}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Last seen */}
+                          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                            <Clock className="w-4 h-4" />
+                            <span>Last seen: {getLastSeenText(device.lastSeen)}</span>
+                          </div>
+
+                          {/* Registration date */}
+                          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Registered: {new Date(device.registeredAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* FCM Token (truncated) */}
+                    <div className="mt-3 p-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">FCM Token</p>
+                      <p className="text-xs font-mono text-gray-600 dark:text-gray-300 truncate">
+                        {device.fcmToken}
                       </p>
-                    </td>
-                    <td className="py-3 px-4">
-                      <p className="text-sm text-gray-600">
-                        {new Date(device.registeredAt).toLocaleDateString()}
-                      </p>
-                    </td>
-                    <td className="py-3 px-4">
-                      <p className="text-sm text-gray-600">
-                        {new Date(device.lastSeen).toLocaleString()}
-                      </p>
-                    </td>
-                    <td className="py-3 px-4 text-right">
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 mt-3">
                       <button
-                        onClick={() => handleUnregister(device.deviceId)}
-                        disabled={isDeletingId === device.deviceId}
-                        className="text-red-600 hover:text-red-700 disabled:opacity-50 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                        title="Unregister device"
+                        onClick={() => handleTestDevice(device)}
+                        className="btn-secondary text-sm"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <AlertCircle className="w-4 h-4 mr-1" />
+                        Test Alert
                       </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+                      <button
+                        onClick={() => handleDeleteDevice(device.id)}
+                        className="btn-danger text-sm"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Unregister
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Info box */}
-      <div className="card bg-blue-50 border-blue-200">
-        <div className="flex gap-3">
-          <div className="flex-shrink-0">
-            <Smartphone className="w-5 h-5 text-blue-600" />
-          </div>
-          <div className="text-sm text-blue-900">
-            <p className="font-semibold mb-1">About Device Management</p>
-            <ul className="space-y-1 list-disc list-inside text-blue-800">
-              <li>Devices automatically register when users log in to the mobile app</li>
-              <li>Each device has a unique FCM token used for push notifications</li>
-              <li>Unregistering a device will prevent it from receiving alerts until the user logs in again</li>
-              <li>Last seen timestamp updates whenever the device receives an alert or syncs with the backend</li>
-            </ul>
+      {/* Device health warnings */}
+      {devices.some(d => d.batteryLevel && d.batteryLevel < 20) && (
+        <div className="card bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-orange-900 dark:text-orange-300">
+                Low Battery Warning
+              </p>
+              <p className="text-sm text-orange-700 dark:text-orange-400 mt-1">
+                {devices.filter(d => d.batteryLevel && d.batteryLevel < 20).length} device(s) have low battery.
+                They may not receive alerts reliably. Users should charge their devices.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import * as fcm from './fcm.js';
 import routes from './routes.js';
+import enhancedRoutes from './enhanced-features';
 
 // Load environment variables
 dotenv.config();
@@ -25,6 +26,7 @@ fcm.initializeFirebase();
 
 // Mount API routes
 app.use('/api', routes);
+app.use('/api', enhancedRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

@@ -159,6 +159,31 @@ class FirebaseService {
       callback([]);
     });
   }
+
+  // ========== Audit Logs (Firestore) ==========
+  onAuditLogsChange(callback: (logs: any[]) => void, limitCount: number = 100): () => void {
+    const logsRef = collection(db, 'audit_logs');
+    const q = query(logsRef, orderBy('timestamp', 'desc'), limit(limitCount));
+    return onSnapshot(q, (snapshot) => {
+      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(logs);
+    }, (error) => {
+      console.error('Error listening to audit logs:', error);
+      callback([]);
+    });
+  }
+
+  // ========== Devices (Firestore) ==========
+  onDevicesChange(callback: (devices: any[]) => void): () => void {
+    const devicesRef = collection(db, 'devices');
+    return onSnapshot(devicesRef, (snapshot) => {
+      const devices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(devices);
+    }, (error) => {
+      console.error('Error listening to devices:', error);
+      callback([]);
+    });
+  }
 }
 
 export default new FirebaseService();

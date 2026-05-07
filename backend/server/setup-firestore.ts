@@ -35,7 +35,7 @@ async function setupFirestore() {
             displayName: 'Mpumelelo Magagula',
             role: 'ADMIN',
             position: 'DevOps Engineer & Founder',
-            department: 'InfinityWork IT Solutions',
+            department: 'Altron',
             phoneNumber: '',
             isActive: true,
             createdAt: Date.now(),

@@ -1,5 +1,21 @@
 import { useState, useEffect } from 'react';
-import { Bell, Send, TestTube, Clock, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { 
+  Bell, 
+  Send, 
+  TestTube, 
+  Clock, 
+  AlertCircle, 
+  AlertTriangle, 
+  Info,
+  Search,
+  Filter,
+  CheckSquare,
+  Square,
+  Trash2,
+  CheckCircle2,
+  XCircle,
+  UserCheck
+} from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../services/api';
 import firebase from '../services/firebase';
@@ -7,9 +23,18 @@ import type { Alert, TestAlertFormData, Severity } from '../types';
 
 export default function Alerts() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [filteredAlerts, setFilteredAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   
+  // Filter and search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [severityFilter, setSeverityFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   // Form state
   const [testAlert, setTestAlert] = useState<TestAlertFormData>({
     title: '',
@@ -29,23 +54,100 @@ export default function Alerts() {
   ];
 
   useEffect(() => {
-    // Fallback timeout in case Firebase is blocked by an adblocker (ERR_BLOCKED_BY_CLIENT)
     const timeout = setTimeout(() => {
       setIsLoading(false);
     }, 5000);
 
-    // Subscribe to real-time alerts
     const unsubscribe = firebase.onAlertsChange((updatedAlerts) => {
       setAlerts(updatedAlerts);
       setIsLoading(false);
       clearTimeout(timeout);
-    }, 20);
+    }, 100);
 
     return () => {
       unsubscribe();
       clearTimeout(timeout);
     };
   }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [alerts, searchQuery, severityFilter, statusFilter]);
+
+  const applyFilters = () => {
+    let filtered = [...alerts];
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(a => 
+        a.title.toLowerCase().includes(query) || 
+        a.body.toLowerCase().includes(query) ||
+        a.channelName.toLowerCase().includes(query)
+      );
+    }
+
+    if (severityFilter !== 'ALL') {
+      filtered = filtered.filter(a => a.severity === severityFilter);
+    }
+
+    if (statusFilter === 'READ') {
+      filtered = filtered.filter(a => a.isRead);
+    } else if (statusFilter === 'UNREAD') {
+      filtered = filtered.filter(a => !a.isRead);
+    }
+
+    setFilteredAlerts(filtered);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredAlerts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredAlerts.map(a => a.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleBulkMarkRead = async () => {
+    if (selectedIds.size === 0) return;
+    
+    try {
+      setIsSending(true);
+      await api.bulkMarkAlertsRead(Array.from(selectedIds));
+      toast.success(`Marked ${selectedIds.size} alerts as read`);
+      setSelectedIds(new Set());
+    } catch (error) {
+      toast.error('Failed to update alerts');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} alerts?`)) return;
+
+    try {
+      setIsSending(true);
+      await api.bulkDeleteAlerts(Array.from(selectedIds));
+      toast.success(`Deleted ${selectedIds.size} alerts`);
+      setSelectedIds(new Set());
+    } catch (error) {
+      toast.error('Failed to delete alerts');
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   const handleSendToAll = async () => {
     if (!testAlert.title || !testAlert.message) {
@@ -57,8 +159,6 @@ export default function Alerts() {
       setIsSending(true);
       await api.sendTestAlert(testAlert);
       toast.success('Alert sent to all devices');
-      
-      // Reset form
       setTestAlert({
         title: '',
         message: '',
@@ -67,7 +167,6 @@ export default function Alerts() {
         channelName: 'Test Channel',
       });
     } catch (error) {
-      console.error('Failed to send alert:', error);
       toast.error('Failed to send alert');
     } finally {
       setIsSending(false);
@@ -84,8 +183,6 @@ export default function Alerts() {
       setIsSending(true);
       await api.sendStandbyAlert(testAlert);
       toast.success('Alert sent to standby person');
-      
-      // Reset form
       setTestAlert({
         title: '',
         message: '',
@@ -94,7 +191,6 @@ export default function Alerts() {
         channelName: 'Test Channel',
       });
     } catch (error) {
-      console.error('Failed to send alert:', error);
       toast.error('Failed to send alert to standby');
     } finally {
       setIsSending(false);
@@ -127,7 +223,6 @@ export default function Alerts() {
       await api.sendGrafanaWebhook(grafanaPayload);
       toast.success('Grafana webhook test successful');
     } catch (error) {
-      console.error('Failed to test Grafana webhook:', error);
       toast.error('Failed to test Grafana webhook');
     } finally {
       setIsSending(false);
@@ -136,23 +231,17 @@ export default function Alerts() {
 
   const getSeverityIcon = (severity: Severity) => {
     switch (severity) {
-      case 'CRITICAL':
-        return <AlertCircle className="w-4 h-4" />;
-      case 'WARNING':
-        return <AlertTriangle className="w-4 h-4" />;
-      case 'INFO':
-        return <Info className="w-4 h-4" />;
+      case 'CRITICAL': return <AlertCircle className="w-4 h-4" />;
+      case 'WARNING': return <AlertTriangle className="w-4 h-4" />;
+      case 'INFO': return <Info className="w-4 h-4" />;
     }
   };
 
   const getSeverityColor = (severity: Severity) => {
     switch (severity) {
-      case 'CRITICAL':
-        return 'bg-red-100 text-red-600';
-      case 'WARNING':
-        return 'bg-orange-100 text-orange-600';
-      case 'INFO':
-        return 'bg-blue-100 text-blue-600';
+      case 'CRITICAL': return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
+      case 'WARNING': return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
+      case 'INFO': return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400';
     }
   };
 
@@ -161,7 +250,7 @@ export default function Alerts() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading alerts...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading alerts...</p>
         </div>
       </div>
     );
@@ -171,257 +260,239 @@ export default function Alerts() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Alerts</h1>
-        <p className="text-gray-600 mt-2">Test alert delivery and view alert history</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Alerts</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-2">Test alert delivery and manage alert history</p>
       </div>
 
-      {/* Test Alert Form */}
-      <div className="card">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Send Test Alert</h2>
-        
-        <div className="space-y-4">
-          {/* Alert Title */}
-          <div>
-            <label htmlFor="alert-title" className="block text-sm font-medium text-gray-700 mb-2">
-              Alert Title
-            </label>
-            <input
-              id="alert-title"
-              type="text"
-              value={testAlert.title}
-              onChange={(e) => setTestAlert({ ...testAlert, title: e.target.value })}
-              className="input"
-              placeholder="e.g., CPU Usage Critical"
-              disabled={isSending}
-            />
-          </div>
-
-          {/* Alert Message */}
-          <div>
-            <label htmlFor="alert-message" className="block text-sm font-medium text-gray-700 mb-2">
-              Alert Message
-            </label>
-            <textarea
-              id="alert-message"
-              value={testAlert.message}
-              onChange={(e) => setTestAlert({ ...testAlert, message: e.target.value })}
-              className="input min-h-[100px] resize-none"
-              placeholder="e.g., CPU has been above 90% for 5 minutes. Current: 97%"
-              disabled={isSending}
-            />
-          </div>
-
-          {/* Severity and Channel */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Severity */}
-            <div>
-              <label htmlFor="alert-severity" className="block text-sm font-medium text-gray-700 mb-2">
-                Severity
-              </label>
-              <select
-                id="alert-severity"
-                value={testAlert.severity}
-                onChange={(e) => setTestAlert({ ...testAlert, severity: e.target.value as Severity })}
-                className="input"
-                disabled={isSending}
-              >
-                <option value="CRITICAL">Critical</option>
-                <option value="WARNING">Warning</option>
-                <option value="INFO">Info</option>
-              </select>
-            </div>
-
-            {/* Channel */}
-            <div>
-              <label htmlFor="alert-channel" className="block text-sm font-medium text-gray-700 mb-2">
-                Channel
-              </label>
-              <select
-                id="alert-channel"
-                value={testAlert.channelId}
-                onChange={(e) => {
-                  const channel = channels.find(c => c.id === e.target.value);
-                  setTestAlert({
-                    ...testAlert,
-                    channelId: e.target.value,
-                    channelName: channel?.name || 'Test Channel',
-                  });
-                }}
-                className="input"
-                disabled={isSending}
-              >
-                {channels.map((channel) => (
-                  <option key={channel.id} value={channel.id}>
-                    {channel.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handleSendToAll}
-              disabled={isSending}
-              className="btn-primary flex items-center gap-2 disabled:opacity-50"
-            >
-              <Send className="w-4 h-4" />
-              Send to All Devices
-            </button>
+      {/* Main Content Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Form and Stats */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Send Test Alert */}
+          <div className="card">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Send Test Alert</h2>
             
-            <button
-              onClick={handleSendToStandby}
-              disabled={isSending}
-              className="btn-secondary flex items-center gap-2 disabled:opacity-50"
-            >
-              <Send className="w-4 h-4" />
-              Send to Standby Only
-            </button>
-            
-            <button
-              onClick={handleTestGrafanaWebhook}
-              disabled={isSending}
-              className="btn-secondary flex items-center gap-2 disabled:opacity-50"
-            >
-              <TestTube className="w-4 h-4" />
-              Test Grafana Webhook
-            </button>
-          </div>
-        </div>
-      </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+                <input
+                  type="text"
+                  value={testAlert.title}
+                  onChange={(e) => setTestAlert({ ...testAlert, title: e.target.value })}
+                  className="input"
+                  placeholder="e.g., CPU Usage Critical"
+                  disabled={isSending}
+                />
+              </div>
 
-      {/* Alert Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-              <Bell className="w-5 h-5 text-primary-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Alerts</p>
-              <p className="text-xl font-bold text-gray-900">{alerts.length}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <AlertCircle className="w-5 h-5 text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Critical</p>
-              <p className="text-xl font-bold text-gray-900">
-                {alerts.filter(a => a.severity === 'CRITICAL').length}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Warning</p>
-              <p className="text-xl font-bold text-gray-900">
-                {alerts.filter(a => a.severity === 'WARNING').length}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Info className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Info</p>
-              <p className="text-xl font-bold text-gray-900">
-                {alerts.filter(a => a.severity === 'INFO').length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Message</label>
+                <textarea
+                  value={testAlert.message}
+                  onChange={(e) => setTestAlert({ ...testAlert, message: e.target.value })}
+                  className="input min-h-[80px] resize-none"
+                  placeholder="Alert details..."
+                  disabled={isSending}
+                />
+              </div>
 
-      {/* Alert History */}
-      <div className="card">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Alert History</h2>
-        
-        {alerts.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <Clock className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-            <p>No alerts yet</p>
-            <p className="text-sm mt-2">Send a test alert above to get started</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {alerts.map((alert) => (
-              <div
-                key={alert.id}
-                className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                {/* Severity icon */}
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${getSeverityColor(alert.severity)}`}>
-                  {getSeverityIcon(alert.severity)}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Severity</label>
+                  <select
+                    value={testAlert.severity}
+                    onChange={(e) => setTestAlert({ ...testAlert, severity: e.target.value as Severity })}
+                    className="input"
+                    disabled={isSending}
+                  >
+                    <option value="CRITICAL">Critical</option>
+                    <option value="WARNING">Warning</option>
+                    <option value="INFO">Info</option>
+                  </select>
                 </div>
-
-                {/* Alert content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900">{alert.title}</p>
-                      <p className="text-sm text-gray-600 mt-1">{alert.body}</p>
-                    </div>
-                    <span className={`badge flex-shrink-0 ${
-                      alert.severity === 'CRITICAL' ? 'badge-critical' :
-                      alert.severity === 'WARNING' ? 'badge-warning' :
-                      'badge-info'
-                    }`}>
-                      {alert.severity}
-                    </span>
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
-                    <span className="font-medium">{alert.channelName}</span>
-                    <span>•</span>
-                    <span>{new Date(alert.timestamp).toLocaleString()}</span>
-                    <span>•</span>
-                    <span>Source: {alert.source}</span>
-                    {alert.acknowledgedBy && (
-                      <>
-                        <span>•</span>
-                        <span className="text-green-600">
-                          Acked by {alert.acknowledgedBy}
-                        </span>
-                      </>
-                    )}
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Channel</label>
+                  <select
+                    value={testAlert.channelId}
+                    onChange={(e) => {
+                      const channel = channels.find(c => c.id === e.target.value);
+                      setTestAlert({ ...testAlert, channelId: e.target.value, channelName: channel?.name || '' });
+                    }}
+                    className="input"
+                    disabled={isSending}
+                  >
+                    {channels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Info box */}
-      <div className="card bg-blue-50 border-blue-200">
-        <div className="flex gap-3">
-          <div className="flex-shrink-0">
-            <TestTube className="w-5 h-5 text-blue-600" />
+              <div className="flex flex-col gap-2 pt-2">
+                <button onClick={handleSendToAll} disabled={isSending} className="btn-primary w-full flex items-center justify-center gap-2">
+                  <Send className="w-4 h-4" /> Send to All
+                </button>
+                <button onClick={handleSendToStandby} disabled={isSending} className="btn-secondary w-full flex items-center justify-center gap-2">
+                  <UserCheck className="w-4 h-4" /> Send to Standby
+                </button>
+                <button onClick={handleTestGrafanaWebhook} disabled={isSending} className="btn-secondary w-full flex items-center justify-center gap-2">
+                  <TestTube className="w-4 h-4" /> Test Webhook
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="text-sm text-blue-900">
-            <p className="font-semibold mb-1">Testing Alerts</p>
-            <ul className="space-y-1 list-disc list-inside text-blue-800">
-              <li><strong>Send to All:</strong> Broadcasts alert to every registered device</li>
-              <li><strong>Send to Standby:</strong> Only sends to the current on-call person</li>
-              <li><strong>Test Grafana:</strong> Simulates a real Grafana webhook payload</li>
-              <li>Alerts appear in real-time in the mobile app</li>
-            </ul>
+
+          {/* Alert Stats */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="card p-4">
+              <p className="text-xs text-gray-500 uppercase font-bold mb-1">Total</p>
+              <p className="text-2xl font-bold dark:text-white">{alerts.length}</p>
+            </div>
+            <div className="card p-4">
+              <p className="text-xs text-red-500 uppercase font-bold mb-1">Critical</p>
+              <p className="text-2xl font-bold text-red-600">{alerts.filter(a => a.severity === 'CRITICAL').length}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - History and Management */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Filters and Search */}
+          <div className="card">
+            <div className="flex flex-col md:flex-row md:items-center gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search alerts..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="input pl-10"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-gray-400" />
+                <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="input w-32">
+                  <option value="ALL">All Sev</option>
+                  <option value="CRITICAL">Critical</option>
+                  <option value="WARNING">Warning</option>
+                  <option value="INFO">Info</option>
+                </select>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input w-32">
+                  <option value="ALL">All Status</option>
+                  <option value="READ">Read</option>
+                  <option value="UNREAD">Unread</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Bulk Actions Bar */}
+            {selectedIds.size > 0 && (
+              <div className="mt-4 p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-800 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-primary-700 dark:text-primary-400">
+                    {selectedIds.size} selected
+                  </span>
+                  <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-500 hover:text-gray-700">
+                    Deselect all
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleBulkMarkRead} className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Mark Read
+                  </button>
+                  <button onClick={handleBulkDelete} className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 py-1.5 px-3 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Alert List */}
+          <div className="card min-h-[400px]">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Alert History</h2>
+              <button 
+                onClick={toggleSelectAll}
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+              >
+                {selectedIds.size === filteredAlerts.length && filteredAlerts.length > 0 ? (
+                  <><XCircle className="w-4 h-4" /> Deselect All</>
+                ) : (
+                  <><CheckSquare className="w-4 h-4" /> Select All</>
+                )}
+              </button>
+            </div>
+
+            {filteredAlerts.length === 0 ? (
+              <div className="text-center py-20 text-gray-500 dark:text-gray-400">
+                <Bell className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
+                <p>No alerts found matching filters</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    onClick={() => toggleSelect(alert.id)}
+                    className={`flex items-start gap-3 p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                      selectedIds.has(alert.id) 
+                        ? 'bg-primary-50 dark:bg-primary-900/10 border-primary-500' 
+                        : 'bg-gray-50 dark:bg-gray-800 border-transparent hover:border-gray-200 dark:hover:border-gray-700'
+                    }`}
+                  >
+                    {/* Checkbox */}
+                    <div className="pt-1">
+                      {selectedIds.has(alert.id) ? (
+                        <CheckSquare className="w-5 h-5 text-primary-600" />
+                      ) : (
+                        <Square className="w-5 h-5 text-gray-300 dark:text-gray-600" />
+                      )}
+                    </div>
+
+                    {/* Severity icon */}
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${getSeverityColor(alert.severity)}`}>
+                      {getSeverityIcon(alert.severity)}
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-semibold dark:text-white ${alert.isRead ? 'text-gray-600 opacity-70' : 'text-gray-900'}`}>
+                            {alert.title}
+                          </p>
+                          <p className={`text-sm mt-1 line-clamp-2 ${alert.isRead ? 'text-gray-500 opacity-70' : 'text-gray-600 dark:text-gray-400'}`}>
+                            {alert.body}
+                          </p>
+                        </div>
+                        <span className={`badge flex-shrink-0 ${
+                          alert.severity === 'CRITICAL' ? 'badge-critical' :
+                          alert.severity === 'WARNING' ? 'badge-warning' :
+                          'badge-info'
+                        }`}>
+                          {alert.severity}
+                        </span>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-gray-500 dark:text-gray-400">
+                        <span className="font-medium bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">
+                          {alert.channelName}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(alert.timestamp).toLocaleString()}
+                        </span>
+                        {alert.isRead && (
+                          <span className="text-green-600 dark:text-green-400 flex items-center gap-1 font-medium">
+                            <CheckCircle2 className="w-3 h-3" /> Acknowledged
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

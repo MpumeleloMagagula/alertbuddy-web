@@ -95,7 +95,7 @@ export default function Standby() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading standby information...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading standby information...</p>
         </div>
       </div>
     );
@@ -106,8 +106,8 @@ export default function Standby() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Standby Management</h1>
-          <p className="text-gray-600 mt-2">Manage on-call rotation and handovers</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Altron Standby Management</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Manage on-call rotation and handovers</p>
         </div>
         <button onClick={loadStandbyData} className="btn-secondary flex items-center gap-2">
           <RefreshCw className="w-4 h-4" />
@@ -117,22 +117,22 @@ export default function Standby() {
 
       {/* Current Standby Status */}
       <div className="card">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Current Standby</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Current Standby</h2>
         
         {standbyInfo?.onStandby ? (
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                <UserCheck className="w-8 h-8 text-green-600" />
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                <UserCheck className="w-8 h-8 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{standbyInfo.displayName}</p>
-                <p className="text-gray-600 mt-1">{standbyInfo.email}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{standbyInfo.displayName}</p>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">{standbyInfo.email}</p>
                 <div className="flex items-center gap-4 mt-3 text-sm">
                   <span className={`badge ${standbyInfo.tokenResolved ? 'badge-success' : 'badge-warning'}`}>
                     Token: {standbyInfo.tokenResolved ? 'Resolved' : 'Pending'}
                   </span>
-                  <span className="text-gray-500">
+                  <span className="text-gray-500 dark:text-gray-400">
                     Updated {new Date(standbyInfo.updatedAt).toLocaleString()}
                   </span>
                 </div>
@@ -147,22 +147,22 @@ export default function Standby() {
           </div>
         ) : (
           <div className="text-center py-8">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <UserCheck className="w-8 h-8 text-gray-400" />
+            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+              <UserCheck className="w-8 h-8 text-gray-400 dark:text-gray-600" />
             </div>
-            <p className="text-xl font-semibold text-gray-900 mb-2">No one on standby</p>
-            <p className="text-gray-600">Assign someone below to start receiving alerts</p>
+            <p className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No one on standby</p>
+            <p className="text-gray-600 dark:text-gray-400">Assign someone below to start receiving alerts</p>
           </div>
         )}
       </div>
 
       {/* Perform Handover */}
       <div className="card">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Perform Handover</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Perform Handover</h2>
         
         <div className="space-y-4">
           <div>
-            <label htmlFor="member-select" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="member-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select Team Member
             </label>
             <select
@@ -193,8 +193,8 @@ export default function Standby() {
         </div>
 
         {teamMembers.filter(m => m.standbyStatus === 'AVAILABLE').length === 0 && (
-          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
+          <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
               No team members available for standby. Make sure team members are added in Firebase.
             </p>
           </div>
@@ -203,11 +203,11 @@ export default function Standby() {
 
       {/* Handover History */}
       <div className="card">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Handovers</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Recent Handovers</h2>
         
         {handoverLogs.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <Clock className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <Clock className="w-12 h-12 mx-auto mb-3 text-gray-400 dark:text-gray-600" />
             <p>No handover history yet</p>
           </div>
         ) : (
@@ -215,15 +215,15 @@ export default function Standby() {
             {handoverLogs.map((log) => (
               <div
                 key={log.id}
-                className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg"
+                className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
-                    <span className="font-semibold text-gray-900">{log.fromUserName}</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">{log.fromUserName}</span>
                     <ArrowRight className="w-4 h-4 text-gray-400" />
-                    <span className="font-semibold text-gray-900">{log.toUserName}</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">{log.toUserName}</span>
                   </div>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
                     <span>{new Date(log.handoverAt).toLocaleString()}</span>
                     {log.notes && (
                       <>
@@ -247,32 +247,31 @@ export default function Standby() {
         )}
       </div>
 
-      {/* Shift Schedule - Placeholder */}
-      <div className="card bg-blue-50 border-blue-200">
+      {/* Shift Schedule */}
+      <div className="card bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50">
         <div className="flex items-start gap-3">
-          <Calendar className="w-5 h-5 text-blue-600 mt-1" />
+          <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-1" />
           <div>
-            <h3 className="font-semibold text-blue-900 mb-2">Shift Scheduling</h3>
-            <p className="text-sm text-blue-800 mb-3">
-              Create and manage scheduled shifts to automatically assign standby duties.
-              This feature requires backend implementation.
+            <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-2">Shift Scheduling</h3>
+            <p className="text-sm text-blue-800 dark:text-blue-400 mb-3">
+              Automate standby assignments by creating a weekly rotation schedule.
             </p>
-            <button className="btn-secondary text-sm opacity-50 cursor-not-allowed" disabled>
-              Manage Shifts (Coming Soon)
+            <button className="btn-secondary text-sm">
+              Manage Shifts
             </button>
           </div>
         </div>
       </div>
 
       {/* Info box */}
-      <div className="card bg-blue-50 border-blue-200">
+      <div className="card bg-primary-50 dark:bg-primary-900/10 border-primary-200 dark:border-primary-800/50">
         <div className="flex gap-3">
           <div className="flex-shrink-0">
-            <UserCheck className="w-5 h-5 text-blue-600" />
+            <UserCheck className="w-5 h-5 text-primary-600 dark:text-primary-400" />
           </div>
-          <div className="text-sm text-blue-900">
-            <p className="font-semibold mb-1">How Standby Works</p>
-            <ul className="space-y-1 list-disc list-inside text-blue-800">
+          <div className="text-sm text-primary-900 dark:text-primary-300">
+            <p className="font-semibold mb-1 text-primary-950 dark:text-primary-200">How Standby Works</p>
+            <ul className="space-y-1 list-disc list-inside text-primary-800 dark:text-primary-400">
               <li>Only one person can be on standby at a time</li>
               <li>All critical alerts are routed to the on-standby person</li>
               <li>If no one is on standby, alerts broadcast to all devices</li>

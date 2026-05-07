@@ -104,64 +104,90 @@ class ApiService {
 
   // ========== User Management (requires backend extension) ==========
   async getUsers(): Promise<User[]> {
-    // TODO: Implement backend endpoint
     const { data } = await this.api.get<User[]>('/api/users');
     return data;
   }
 
   async createUser(userData: Partial<User>): Promise<ApiResponse<User>> {
-    // TODO: Implement backend endpoint
     const { data } = await this.api.post<ApiResponse<User>>('/api/users', userData);
     return data;
   }
 
   async updateUser(userId: string, userData: Partial<User>): Promise<ApiResponse<User>> {
-    // TODO: Implement backend endpoint
     const { data } = await this.api.put<ApiResponse<User>>(`/api/users/${userId}`, userData);
     return data;
   }
 
   async deleteUser(userId: string): Promise<ApiResponse> {
-    // TODO: Implement backend endpoint
     const { data} = await this.api.delete<ApiResponse>(`/api/users/${userId}`);
     return data;
   }
 
   // ========== Team Member Management (requires backend extension) ==========
   async getTeamMembers(): Promise<TeamMember[]> {
-    // TODO: Implement backend endpoint
     const { data } = await this.api.get<TeamMember[]>('/api/team');
     return data;
   }
 
   async updateTeamMember(memberId: string, memberData: Partial<TeamMember>): Promise<ApiResponse> {
-    // TODO: Implement backend endpoint
     const { data } = await this.api.put<ApiResponse>(`/api/team/${memberId}`, memberData);
     return data;
   }
 
   // ========== Shift Management (requires backend extension) ==========
   async getShifts(): Promise<Shift[]> {
-    // TODO: Implement backend endpoint
     const { data } = await this.api.get<Shift[]>('/api/shifts');
     return data;
   }
 
   async createShift(shiftData: Partial<Shift>): Promise<ApiResponse<Shift>> {
-    // TODO: Implement backend endpoint
     const { data } = await this.api.post<ApiResponse<Shift>>('/api/shifts', shiftData);
     return data;
   }
 
   async deleteShift(shiftId: string): Promise<ApiResponse> {
-    // TODO: Implement backend endpoint
     const { data } = await this.api.delete<ApiResponse>(`/api/shifts/${shiftId}`);
     return data;
   }
 
   async activateShift(shiftId: string): Promise<ApiResponse> {
-    // TODO: Implement backend endpoint
     const { data } = await this.api.post<ApiResponse>(`/api/shifts/${shiftId}/activate`);
+    return data;
+  }
+
+  // ========== Enhanced Features ==========
+  async bulkMarkAlertsRead(alertIds: string[], userId?: string, userEmail?: string): Promise<any> {
+    const { data } = await this.api.post('/api/alerts/bulk-mark-read', { alertIds, userId, userEmail });
+    return data;
+  }
+
+  async bulkDeleteAlerts(alertIds: string[], userId?: string, userEmail?: string): Promise<any> {
+    const { data } = await this.api.post('/api/alerts/bulk-delete', { alertIds, userId, userEmail });
+    return data;
+  }
+
+  async getAuditLogs(params?: { limit?: number; action?: string; startDate?: number; endDate?: number }): Promise<any[]> {
+    const { data } = await this.api.get('/api/audit-logs', { params });
+    return data;
+  }
+
+  async getDeviceHealthSummary(): Promise<any> {
+    const { data } = await this.api.get('/api/devices/health-summary');
+    return data;
+  }
+
+  async getAlertTemplates(): Promise<any[]> {
+    const { data } = await this.api.get('/api/alert-templates');
+    return data;
+  }
+
+  async createAlertTemplate(templateData: any): Promise<any> {
+    const { data } = await this.api.post('/api/alert-templates', templateData);
+    return data;
+  }
+
+  async deleteAlertTemplate(templateId: string): Promise<any> {
+    const { data } = await this.api.delete(`/api/alert-templates/${templateId}`);
     return data;
   }
 }

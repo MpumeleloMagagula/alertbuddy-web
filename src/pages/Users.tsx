@@ -60,8 +60,8 @@ export default function Users() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading users...</p>
+          <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto shadow-sm"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading users...</p>
         </div>
       </div>
     );
@@ -72,8 +72,8 @@ export default function Users() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Users</h1>
-          <p className="text-gray-600 mt-2">Manage user accounts and permissions</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Altron Users</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Manage user accounts and permissions</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -88,23 +88,23 @@ export default function Users() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-              <UsersIcon className="w-5 h-5 text-primary-600" />
+            <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-lg flex items-center justify-center">
+              <UsersIcon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Total Users</p>
-              <p className="text-xl font-bold text-gray-900">{users.length}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{users.length}</p>
             </div>
           </div>
         </div>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <Shield className="w-5 h-5 text-red-600" />
+            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+              <Shield className="w-5 h-5 text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Admins</p>
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Admins</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">
                 {users.filter(u => u.role === 'ADMIN').length}
               </p>
             </div>
@@ -112,12 +112,12 @@ export default function Users() {
         </div>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Shield className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+              <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Managers</p>
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Managers</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">
                 {users.filter(u => u.role === 'MANAGER').length}
               </p>
             </div>
@@ -125,12 +125,12 @@ export default function Users() {
         </div>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <UsersIcon className="w-5 h-5 text-green-600" />
+            <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+              <UsersIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Active Users</p>
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Active Users</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">
                 {users.filter(u => u.isActive).length}
               </p>
             </div>
@@ -141,8 +141,8 @@ export default function Users() {
       {/* Users table */}
       <div className="card">
         {users.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <UsersIcon className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            <UsersIcon className="w-12 h-12 mx-auto mb-3 text-gray-400 dark:text-gray-600" />
             <p>No users found</p>
             <button
               onClick={() => setShowAddModal(true)}
@@ -155,46 +155,46 @@ export default function Users() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Name</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Email</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Role</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Department</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Created</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
+                <tr className="border-b border-gray-200 dark:border-gray-800">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Name</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Email</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Role</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Department</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Status</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Created</th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((user) => (
                   <tr
                     key={user.id}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                    className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
                   >
                     <td className="py-3 px-4">
-                      <p className="font-medium text-gray-900">{user.displayName}</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{user.displayName}</p>
                       {user.position && (
-                        <p className="text-xs text-gray-500">{user.position}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{user.position}</p>
                       )}
                     </td>
                     <td className="py-3 px-4">
-                      <p className="text-sm text-gray-600">{user.email}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{user.email}</p>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`badge ${getRoleBadgeColor(user.role)}`}>
+                      <span className={`badge ${getRoleBadgeColor(user.role)} dark:bg-opacity-20`}>
                         {user.role}
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <p className="text-sm text-gray-600">{user.department || '-'}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{user.department || '-'}</p>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`badge ${user.isActive ? 'badge-success' : 'bg-gray-100 text-gray-800'}`}>
+                      <span className={`badge ${user.isActive ? 'badge-success' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'}`}>
                         {user.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
                         {new Date(user.createdAt).toLocaleDateString()}
                       </p>
                     </td>
@@ -202,14 +202,14 @@ export default function Users() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => setEditingUser(user)}
-                          className="text-primary-600 hover:text-primary-700 p-2 rounded-lg hover:bg-primary-50 transition-colors"
+                          className="text-primary-600 hover:text-primary-700 p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
                           title="Edit user"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteUser(user.id)}
-                          className="text-red-600 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                          className="text-red-600 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                           title="Delete user"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -225,14 +225,14 @@ export default function Users() {
       </div>
 
       {/* Info box */}
-      <div className="card bg-blue-50 border-blue-200">
+      <div className="card bg-primary-50 dark:bg-primary-900/10 border-primary-200 dark:border-primary-800/50">
         <div className="flex gap-3">
           <div className="flex-shrink-0">
-            <Shield className="w-5 h-5 text-blue-600" />
+            <Shield className="w-5 h-5 text-primary-600 dark:text-primary-400" />
           </div>
-          <div className="text-sm text-blue-900">
-            <p className="font-semibold mb-1">User Roles Explained</p>
-            <ul className="space-y-1 list-disc list-inside text-blue-800">
+          <div className="text-sm text-primary-900 dark:text-primary-300">
+            <p className="font-semibold mb-1 text-primary-950 dark:text-primary-200">User Roles Explained</p>
+            <ul className="space-y-1 list-disc list-inside text-primary-800 dark:text-primary-400">
               <li><strong>Admin:</strong> Full system access, can manage all users and settings</li>
               <li><strong>Manager:</strong> Can manage team members, shifts, and view all alerts</li>
               <li><strong>User:</strong> Can receive alerts and participate in standby rotation</li>
@@ -244,11 +244,11 @@ export default function Users() {
       {/* Add/Edit User Modal - Placeholder */}
       {(showAddModal || editingUser) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
               {editingUser ? 'Edit User' : 'Add New User'}
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               User management forms will be implemented with Firebase Authentication integration.
             </p>
             <div className="flex gap-3">

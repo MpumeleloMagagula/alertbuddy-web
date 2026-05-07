@@ -436,4 +436,10 @@ For issues:
 
 ---
 
-**InfinityWork IT Solutions** - Infinite Tech. Limitless Solutions.
+# Run the Backend Server
+backend
+npm run dev
+
+# Run the Frontend Server
+frontend
+npm run dev
