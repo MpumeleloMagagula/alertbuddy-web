@@ -58,7 +58,7 @@ export default function Alerts() {
       setIsLoading(false);
     }, 5000);
 
-    const unsubscribe = firebase.onAlertsChange((updatedAlerts) => {
+    const unsubscribe = firebase.onAlertsChange((updatedAlerts: Alert[]) => {
       setAlerts(updatedAlerts);
       setIsLoading(false);
       clearTimeout(timeout);
