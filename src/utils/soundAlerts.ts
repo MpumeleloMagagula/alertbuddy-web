@@ -1,4 +1,4 @@
-import type { Severity } from '../types';
+import { Severity } from '../types';
 
 /**
  * Play an alert sound based on severity level
@@ -15,9 +15,9 @@ export const playAlertSound = (severity: Severity, duration: number = 500) => {
 
     // Different frequencies for different severities
     const frequencies: Record<Severity, number> = {
-      CRITICAL: 800,  // High pitch for critical
-      WARNING: 600,   // Medium pitch for warning
-      INFO: 400,      // Low pitch for info
+      [Severity.CRITICAL]: 800,  // High pitch for critical
+      [Severity.WARNING]: 600,   // Medium pitch for warning
+      [Severity.INFO]: 400,      // Low pitch for info
     };
 
     oscillator.frequency.value = frequencies[severity];
@@ -46,9 +46,9 @@ export const playAlertSound = (severity: Severity, duration: number = 500) => {
  * Play a sequence of beeps for critical alerts
  */
 export const playCriticalAlertSequence = () => {
-  playAlertSound('CRITICAL', 200);
-  setTimeout(() => playAlertSound('CRITICAL', 200), 300);
-  setTimeout(() => playAlertSound('CRITICAL', 200), 600);
+  playAlertSound(Severity.CRITICAL, 200);
+  setTimeout(() => playAlertSound(Severity.CRITICAL, 200), 300);
+  setTimeout(() => playAlertSound(Severity.CRITICAL, 200), 600);
 };
 
 /**

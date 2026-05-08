@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, Send, TestTube, Clock, AlertCircle, AlertTriangle, Info, Search, Filter, CheckCircle2, Trash2 } from 'lucide-react';
+import { Send, TestTube, Clock, AlertCircle, AlertTriangle, Info, Search, Filter, CheckCircle2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../services/api';
 import firebase from '../services/firebase';
@@ -41,7 +41,7 @@ export default function Alerts() {
     loadAlerts();
     
     // Subscribe to real-time alerts
-    const unsubscribe = firebase.onAlertsChange((updatedAlerts) => {
+    const unsubscribe = firebase.onAlertsChange((updatedAlerts: Alert[]) => {
       setAlerts(updatedAlerts);
     }, 100);
 

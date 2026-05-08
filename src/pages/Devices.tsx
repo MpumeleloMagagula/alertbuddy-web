@@ -6,7 +6,6 @@ import {
   BatteryMedium,
   BatteryFull,
   Wifi,
-  WifiOff,
   Clock,
   AlertCircle,
   CheckCircle2,
@@ -16,21 +15,9 @@ import {
 import { toast } from 'sonner';
 import api from '../services/api';
 import firebase from '../services/firebase';
+import type { Device, Severity } from '../types';
+import { Severity as SeverityEnum } from '../types';
 
-interface Device {
-  id: string;
-  userId: string;
-  email: string;
-  fcmToken: string;
-  deviceModel?: string;
-  osVersion?: string;
-  appVersion?: string;
-  batteryLevel?: number;
-  isCharging?: boolean;
-  lastSeen: number;
-  registeredAt: number;
-  isOnline?: boolean;
-}
 
 export default function Devices() {
   const [devices, setDevices] = useState<Device[]>([]);
@@ -80,7 +67,7 @@ export default function Devices() {
       await api.sendTestAlert({
         title: 'Device Test',
         message: `Testing notification delivery to ${device.deviceModel || 'device'}`,
-        severity: 'INFO',
+        severity: Severity.INFO,
         channelId: 'test',
         channelName: 'Test',
       });

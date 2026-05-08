@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
   Bell,
-  Users,
   AlertCircle,
   AlertTriangle,
   Info,

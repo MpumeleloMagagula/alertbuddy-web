@@ -57,11 +57,19 @@ export interface Alert {
 
 // Device Types
 export interface Device {
+  id: string;
   deviceId: string;
+  userId: string;
   fcmToken: string;
   email: string;
-  registeredAt: number;
+  deviceModel?: string;
+  osVersion?: string;
+  appVersion?: string;
+  batteryLevel?: number;
+  isCharging?: boolean;
   lastSeen: number;
+  registeredAt: number;
+  isOnline?: boolean;
 }
 
 // Standby Types
