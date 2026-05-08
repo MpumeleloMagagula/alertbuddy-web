@@ -106,7 +106,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Altron Dashboard</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Alert Dashboard</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">System overview and analytics</p>
       </div>
 

@@ -44,7 +44,7 @@ export default function Login() {
             <Bell className="w-10 h-10 text-primary-500" />
           </div>
           <h1 className="text-4xl font-black text-white tracking-tight mb-2">
-            Altron <span className="text-primary-500">Buddy</span>
+            Alert <span className="text-primary-500">Buddy</span>
           </h1>
           <p className="text-gray-400 font-medium">Critical Alert Management Portal</p>
         </div>
@@ -67,7 +67,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all"
-                  placeholder="name@altron.com"
+                  placeholder="name@alertbuddy.com"
                   disabled={isLoading}
                   required
                 />
@@ -106,14 +106,14 @@ export default function Login() {
 
           {/* Additional info */}
           <div className="mt-10 pt-8 border-t border-white/5 text-center">
-            <p className="text-gray-500 text-sm font-medium">Internal Altron Network Only</p>
-            <p className="text-gray-600 text-xs mt-2 uppercase tracking-widest">Secured by Altron Digital Ops</p>
+            <p className="text-gray-500 text-sm font-medium">Internal Alert Network Only</p>
+            <p className="text-gray-600 text-xs mt-2 uppercase tracking-widest">Secured by Alert Buddy Ops</p>
           </div>
         </div>
 
         {/* Footer */}
         <div className="text-center mt-10 text-gray-600 text-xs">
-          <p>© 2026 Altron Digital Infrastructure. All rights reserved.</p>
+          <p>© 2026 Alert Buddy Infrastructure. All rights reserved.</p>
         </div>
       </div>
     </div>

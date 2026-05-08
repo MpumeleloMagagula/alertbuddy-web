@@ -106,7 +106,7 @@ export default function Standby() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Altron Standby Management</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Alert Standby Management</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">Manage on-call rotation and handovers</p>
         </div>
         <button onClick={loadStandbyData} className="btn-secondary flex items-center gap-2">

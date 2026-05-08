@@ -26,7 +26,7 @@ export default function Header() {
       {/* Page title - can be customized per page */}
       <div>
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-          <span className="text-primary-600">Altron</span> Portal
+          <span className="text-primary-600">Alert</span> Portal
         </h2>
       </div>
 
