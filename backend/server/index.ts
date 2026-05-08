@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import * as fcm from './fcm.js';
-import routes from './routes.js';
+import * as fcm from './fcm';
+import routes from './routes';
 import enhancedRoutes from './enhanced-features';
 
 // Load environment variables

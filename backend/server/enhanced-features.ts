@@ -21,10 +21,10 @@ router.post('/alerts/bulk-mark-read', async (req, res) => {
       return res.status(400).json({ error: 'alertIds array is required' });
     }
 
-    const batch = db.batch();
+    const batch = getDb().batch();
 
     for (const alertId of alertIds) {
-      const alertRef = db.collection('alerts').doc(alertId);
+      const alertRef = getDb().collection('alerts').doc(alertId);
       batch.update(alertRef, {
         isRead: true,
         acknowledgedAt: Date.now(),
@@ -64,10 +64,10 @@ router.post('/alerts/bulk-delete', async (req, res) => {
       return res.status(400).json({ error: 'alertIds array is required' });
     }
 
-    const batch = db.batch();
+    const batch = getDb().batch();
 
     for (const alertId of alertIds) {
-      const alertRef = db.collection('alerts').doc(alertId);
+      const alertRef = getDb().collection('alerts').doc(alertId);
       batch.delete(alertRef);
     }
 
@@ -103,7 +103,7 @@ router.get('/audit-logs', async (req, res) => {
   try {
     const { limit = 100, action, startDate, endDate } = req.query;
 
-    let query = db.collection('audit_logs')
+    let query = getDb().collection('audit_logs')
       .orderBy('timestamp', 'desc')
       .limit(Number(limit));
 
@@ -165,7 +165,7 @@ router.post('/devices/:deviceId/health', async (req, res) => {
     const { deviceId } = req.params;
     const { batteryLevel, isCharging, deviceModel, osVersion, appVersion } = req.body;
 
-    const deviceRef = db.collection('devices').doc(deviceId);
+    const deviceRef = getDb().collection('devices').doc(deviceId);
     const device = await deviceRef.get();
 
     if (!device.exists) {
@@ -195,7 +195,7 @@ router.post('/devices/:deviceId/ping', async (req, res) => {
   try {
     const { deviceId } = req.params;
 
-    const deviceRef = db.collection('devices').doc(deviceId);
+    const deviceRef = getDb().collection('devices').doc(deviceId);
     await deviceRef.update({
       lastSeen: Date.now(),
     });
@@ -212,7 +212,7 @@ router.post('/devices/:deviceId/ping', async (req, res) => {
  */
 router.get('/devices/health-summary', async (req, res) => {
   try {
-    const devicesSnapshot = await db.collection('devices').get();
+    const devicesSnapshot = await getDb().collection('devices').get();
     const devices = devicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     const now = Date.now();
@@ -261,7 +261,7 @@ router.post('/alert-templates', async (req, res) => {
   try {
     const { name, title, message, severity, channelId, channelName } = req.body;
 
-    const templateRef = await db.collection('alert_templates').add({
+    const templateRef = await getDb().collection('alert_templates').add({
       name,
       title,
       message,
@@ -338,7 +338,7 @@ router.get('/users', async (req, res) => {
 router.post('/users', async (req, res) => {
   try {
     const userData = req.body;
-    const userRef = await db.collection('users').add({
+    const userRef = await getDb().collection('users').add({
       ...userData,
       createdAt: Date.now(),
     });
@@ -474,7 +474,7 @@ router.get('/shifts', async (req, res) => {
 router.post('/shifts', async (req, res) => {
   try {
     const shiftData = req.body;
-    const shiftRef = await db.collection('shifts').add({
+    const shiftRef = await getDb().collection('shifts').add({
       ...shiftData,
       createdAt: Date.now(),
     });

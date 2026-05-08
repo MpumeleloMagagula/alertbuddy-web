@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
-import * as fcm from './fcm.js';
-import * as deviceStorage from './device-storage.js';
-import * as standbyStorage from './standby-storage.js';
-import * as grafana from './grafana.js';
+import * as fcm from './fcm';
+import * as deviceStorage from './device-storage';
+import * as standbyStorage from './standby-storage';
+import * as grafana from './grafana';
 
 const router = Router();
 
