@@ -19,7 +19,6 @@ import {
   doc,
   orderBy,
   limit,
-  Timestamp,
 } from 'firebase/firestore';
 import type { User, Alert, TeamMember, HandoverLog } from '../types';
 

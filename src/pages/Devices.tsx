@@ -15,8 +15,7 @@ import {
 import { toast } from 'sonner';
 import api from '../services/api';
 import firebase from '../services/firebase';
-import type { Device, Severity } from '../types';
-import { Severity as SeverityEnum } from '../types';
+import { Device, Severity } from '../types';
 
 
 export default function Devices() {

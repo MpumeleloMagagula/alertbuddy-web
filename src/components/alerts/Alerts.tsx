@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Send, TestTube, Clock, AlertCircle, AlertTriangle, Info, Search, Filter, CheckCircle2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '../services/api';
-import firebase from '../services/firebase';
-import type { Alert, TestAlertFormData, Severity } from '../types';
+import api from '../../services/api';
+import firebase from '../../services/firebase';
+import type { Alert, TestAlertFormData, Severity } from '../../types';
 
 export default function Alerts() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
