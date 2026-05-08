@@ -16,7 +16,7 @@ app.use(cors());
 app.use(express.json());
 
 // Request logging
-app.use((req, res, next) => {
+app.use((req, _res, next) => {
   console.log(`${req.method} ${req.path}`);
   next();
 });
@@ -29,7 +29,7 @@ app.use('/api', routes);
 app.use('/api', enhancedRoutes);
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.json({
     name: 'Alert Buddy Backend',
     version: '1.0.0',
@@ -61,7 +61,7 @@ app.use((req, res) => {
 });
 
 // Error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Server error:', err);
   res.status(500).json({
     error: 'Internal server error',
