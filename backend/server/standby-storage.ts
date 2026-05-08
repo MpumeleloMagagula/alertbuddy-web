@@ -1,4 +1,4 @@
-import { getTokenByEmail } from './device-storage.js';
+import { getTokenByEmail } from './device-storage';
 
 /**
  * In-memory standby state storage
@@ -39,7 +39,7 @@ const handoverHistory: HandoverLog[] = [];
 export function updateStandby(
   email: string,
   displayName: string,
-  updatedByEmail?: string
+  _updatedByEmail?: string
 ): StandbyInfo {
   const token = getTokenByEmail(email);
   

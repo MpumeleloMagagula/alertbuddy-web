@@ -210,7 +210,7 @@ router.post('/devices/:deviceId/ping', async (req, res) => {
 /**
  * Get device health status
  */
-router.get('/devices/health-summary', async (req, res) => {
+router.get('/devices/health-summary', async (_req, res) => {
   try {
     const devicesSnapshot = await getDb().collection('devices').get();
     const devices = devicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -239,7 +239,7 @@ router.get('/devices/health-summary', async (req, res) => {
 /**
  * Get alert templates
  */
-router.get('/alert-templates', async (req, res) => {
+router.get('/alert-templates', async (_req, res) => {
   try {
     const snapshot = await getDb().collection('alert_templates').get();
     const templates = snapshot.docs.map(doc => ({
@@ -321,7 +321,7 @@ router.delete('/alert-templates/:templateId', async (req, res) => {
 /**
  * Get all users
  */
-router.get('/users', async (req, res) => {
+router.get('/users', async (_req, res) => {
   try {
     const snapshot = await getDb().collection('users').get();
     const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -414,7 +414,7 @@ router.delete('/users/:userId', async (req, res) => {
 /**
  * Get team members
  */
-router.get('/team', async (req, res) => {
+router.get('/team', async (_req, res) => {
   try {
     const snapshot = await getDb().collection('team_members').get();
     const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -457,7 +457,7 @@ router.put('/team/:memberId', async (req, res) => {
 /**
  * Get all shifts
  */
-router.get('/shifts', async (req, res) => {
+router.get('/shifts', async (_req, res) => {
   try {
     const snapshot = await getDb().collection('shifts').get();
     const shifts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));

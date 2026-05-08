@@ -7,7 +7,7 @@ import * as grafana from './grafana';
 const router = Router();
 
 // ========== Server Status ==========
-router.get('/status', (req: Request, res: Response) => {
+router.get('/status', (_req: Request, res: Response) => {
   const standby = standbyStorage.getCurrentStandby();
   const uptime = process.uptime();
   const hours = Math.floor(uptime / 3600);
@@ -65,13 +65,13 @@ router.post('/devices/unregister', (req: Request, res: Response) => {
   });
 });
 
-router.get('/devices', (req: Request, res: Response) => {
+router.get('/devices', (_req: Request, res: Response) => {
   const devices = deviceStorage.getAllDevices();
   res.json(devices);
 });
 
 // ========== Standby Management ==========
-router.get('/standby/current', (req: Request, res: Response) => {
+router.get('/standby/current', (_req: Request, res: Response) => {
   const standby = standbyStorage.getCurrentStandby();
   res.json(standby);
 });
@@ -95,7 +95,7 @@ router.post('/standby/update', (req: Request, res: Response) => {
   });
 });
 
-router.delete('/standby', (req: Request, res: Response) => {
+router.delete('/standby', (_req: Request, res: Response) => {
   const standby = standbyStorage.clearStandby();
   res.json({
     success: true,
