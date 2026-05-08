@@ -2,6 +2,8 @@ import { useState, FormEvent } from 'react';
 import { Mail, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import firebase from '../services/firebase';
+import logo from '../assets/alert_buddy.png';
+
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -41,7 +43,7 @@ export default function Login() {
         {/* Logo and branding */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl mb-6 overflow-hidden p-2">
-            <img src="/logo.png" alt="Alert Buddy Logo" className="w-full h-full object-contain" />
+            <img src={logo} alt="Alert Buddy Logo" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-4xl font-black text-white tracking-tight mb-2">
             Alert <span className="text-primary-500">Buddy</span>
