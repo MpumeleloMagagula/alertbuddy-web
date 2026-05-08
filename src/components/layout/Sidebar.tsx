@@ -16,8 +16,8 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center shadow-sm shadow-primary-500/20">
-            <Bell className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center shadow-lg shadow-primary-500/30 overflow-hidden p-1">
+            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain brightness-0 invert" />
           </div>
           <div>
             <h1 className="font-bold text-gray-900 dark:text-white">Alert Buddy</h1>
