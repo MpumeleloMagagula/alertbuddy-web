@@ -70,20 +70,24 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log('');
-  console.log('╔═══════════════════════════════════════════════╗');
-  console.log('║   🚀 Alert Buddy Backend Server               ║');
-  console.log('╚═══════════════════════════════════════════════╝');
-  console.log('');
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-  console.log(`✅ Firebase: ${fcm.isFirebaseReady() ? 'Connected ✓' : 'Disabled ⚠️'}`);
-  console.log('');
-  console.log('📡 API Endpoints:');
-  console.log(`   GET  http://localhost:${PORT}/api/status`);
-  console.log(`   POST http://localhost:${PORT}/api/grafana/webhook`);
-  console.log(`   POST http://localhost:${PORT}/api/alerts/send`);
-  console.log('');
-  console.log('Press Ctrl+C to stop the server');
-  console.log('');
-});
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log('');
+    console.log('╔═══════════════════════════════════════════════╗');
+    console.log('║   🚀 Alert Buddy Backend Server               ║');
+    console.log('╚═══════════════════════════════════════════════╝');
+    console.log('');
+    console.log(`✅ Server running on http://localhost:${PORT}`);
+    console.log(`✅ Firebase: ${fcm.isFirebaseReady() ? 'Connected ✓' : 'Disabled ⚠️'}`);
+    console.log('');
+    console.log('📡 API Endpoints:');
+    console.log(`   GET  http://localhost:${PORT}/api/status`);
+    console.log(`   POST http://localhost:${PORT}/api/grafana/webhook`);
+    console.log(`   POST http://localhost:${PORT}/api/alerts/send`);
+    console.log('');
+    console.log('Press Ctrl+C to stop the server');
+    console.log('');
+  });
+}
+
+export default app;
