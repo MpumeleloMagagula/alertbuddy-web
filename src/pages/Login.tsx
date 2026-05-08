@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { Bell, Mail, Lock } from 'lucide-react';
+import { Mail, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import firebase from '../services/firebase';
 
