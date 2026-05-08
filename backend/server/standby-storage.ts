@@ -1,4 +1,4 @@
-import { getTokenByEmail } from './device-storage';
+import { getTokenByEmail } from './device-storage.js';
 
 /**
  * In-memory standby state storage
