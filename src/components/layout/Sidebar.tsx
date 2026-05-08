@@ -18,8 +18,8 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-white/10 dark:bg-primary-900/20 rounded-lg flex items-center justify-center shadow-lg overflow-hidden p-1">
-            <img src={logo} alt="Logo" className="w-full h-full object-contain" />
+          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg overflow-hidden">
+            <img src={logo} alt="Logo" className="w-full h-full object-cover scale-125" />
           </div>
           <div>
             <h1 className="font-bold text-gray-900 dark:text-white">Alert Buddy</h1>

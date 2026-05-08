@@ -42,8 +42,8 @@ export default function Login() {
       <div className="w-full max-w-md relative z-10">
         {/* Logo and branding */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-24 h-24 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl mb-6 overflow-hidden p-2">
-            <img src={logo} alt="Alert Buddy Logo" className="w-full h-full object-contain" />
+          <div className="inline-flex items-center justify-center w-28 h-28 bg-white rounded-2xl border border-white/10 shadow-2xl mb-6 overflow-hidden">
+            <img src={logo} alt="Alert Buddy Logo" className="w-full h-full object-cover scale-110" />
           </div>
           <h1 className="text-4xl font-black text-white tracking-tight mb-2">
             Alert <span className="text-primary-500">Buddy</span>
