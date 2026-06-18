@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import admin from 'firebase-admin';
 import * as fcm from './fcm.js';
 import * as deviceStorage from './device-storage.js';
 import * as standbyStorage from './standby-storage.js';
@@ -23,8 +24,8 @@ router.get('/status', (_req: Request, res: Response) => {
 });
 
 // ========== Device Management ==========
-router.post('/devices/register', (req: Request, res: Response) => {
-  const { deviceId, fcmToken, email } = req.body;
+router.post('/devices/register', async (req: Request, res: Response) => {
+  const { deviceId, fcmToken, email, deviceModel, osVersion, appVersion, batteryLevel, isCharging } = req.body;
 
   if (!deviceId || !fcmToken || !email) {
     return res.status(400).json({
@@ -34,6 +35,27 @@ router.post('/devices/register', (req: Request, res: Response) => {
   }
 
   const device = deviceStorage.registerDevice(deviceId, fcmToken, email);
+
+  // Persist to Firestore so the web portal can see registered devices
+  if (fcm.isFirebaseReady()) {
+    try {
+      await admin.firestore().collection('devices').doc(deviceId).set({
+        deviceId,
+        fcmToken,
+        email,
+        deviceModel: deviceModel ?? null,
+        osVersion: osVersion ?? null,
+        appVersion: appVersion ?? null,
+        batteryLevel: batteryLevel ?? null,
+        isCharging: isCharging ?? null,
+        registeredAt: device.registeredAt,
+        lastSeen: device.lastSeen,
+      }, { merge: true });
+      console.log(`📦 Device saved to Firestore: ${email}`);
+    } catch (err) {
+      console.error('Failed to save device to Firestore:', err);
+    }
+  }
 
   // If this person is on standby, update their token
   const standby = standbyStorage.getCurrentStandby();
@@ -47,7 +69,7 @@ router.post('/devices/register', (req: Request, res: Response) => {
   });
 });
 
-router.post('/devices/unregister', (req: Request, res: Response) => {
+router.post('/devices/unregister', async (req: Request, res: Response) => {
   const { deviceId } = req.body;
 
   if (!deviceId) {
@@ -58,6 +80,15 @@ router.post('/devices/unregister', (req: Request, res: Response) => {
   }
 
   const success = deviceStorage.unregisterDevice(deviceId);
+
+  if (success && fcm.isFirebaseReady()) {
+    try {
+      await admin.firestore().collection('devices').doc(deviceId).delete();
+      console.log(`🗑️  Device removed from Firestore: ${deviceId}`);
+    } catch (err) {
+      console.error('Failed to delete device from Firestore:', err);
+    }
+  }
 
   res.json({
     success,

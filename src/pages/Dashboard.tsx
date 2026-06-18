@@ -19,18 +19,25 @@ export default function Dashboard() {
   const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
   const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
   const [allAlerts, setAllAlerts] = useState<Alert[]>([]);
+  const [deviceCount, setDeviceCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadDashboardData();
 
-    // Subscribe to real-time alerts
-    const unsubscribe = firebase.onAlertsChange((alerts) => {
+    const unsubscribeAlerts = firebase.onAlertsChange((alerts) => {
       setRecentAlerts(alerts.slice(0, 5));
       setAllAlerts(alerts);
     }, 100);
 
-    return () => unsubscribe();
+    const unsubscribeDevices = firebase.onDevicesChange((devices) => {
+      setDeviceCount(devices.length);
+    });
+
+    return () => {
+      unsubscribeAlerts();
+      unsubscribeDevices();
+    };
   }, []);
 
   const loadDashboardData = async () => {
@@ -132,7 +139,7 @@ export default function Dashboard() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Active Devices</p>
               <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                {serverStatus?.registeredDevices || 0}
+                {deviceCount}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Registered</p>
             </div>

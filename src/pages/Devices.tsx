@@ -23,28 +23,13 @@ export default function Devices() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadDevices();
-
-    // Subscribe to real-time device updates
-    const unsubscribe = firebase.onDevicesChange?.((updatedDevices) => {
-      setDevices(updatedDevices);
+    const unsubscribe = firebase.onDevicesChange((updatedDevices) => {
+      setDevices(updatedDevices as Device[]);
+      setIsLoading(false);
     });
 
-    return () => unsubscribe?.();
+    return () => unsubscribe();
   }, []);
-
-  const loadDevices = async () => {
-    try {
-      setIsLoading(true);
-      const data = await api.getDevices();
-      setDevices(data);
-    } catch (error) {
-      console.error('Failed to load devices:', error);
-      toast.error('Failed to load devices');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleDeleteDevice = async (deviceId: string) => {
     if (!confirm('Are you sure you want to unregister this device?')) {
@@ -54,7 +39,6 @@ export default function Devices() {
     try {
       await api.unregisterDevice(deviceId);
       toast.success('Device unregistered successfully');
-      loadDevices();
     } catch (error) {
       console.error('Failed to delete device:', error);
       toast.error('Failed to unregister device');
@@ -157,11 +141,12 @@ export default function Devices() {
           </p>
         </div>
         <button
-          onClick={loadDevices}
+          type="button"
+          onClick={() => toast.info('Device list is synced in real-time')}
           className="btn-secondary flex items-center gap-2"
         >
           <RefreshCw className="w-4 h-4" />
-          Refresh
+          Live
         </button>
       </div>
 
