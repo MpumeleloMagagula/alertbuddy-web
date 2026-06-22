@@ -8,6 +8,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,9 +25,12 @@ jobs:
       - name: Fetch Vercel project and org IDs
         run: |
           PROJECT_INFO=$(curl -s "https://api.vercel.com/v9/projects/alertbuddy-web" \
-            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}")
+            -H "Authorization: Bearer $VERCEL_TOKEN")
           echo "VERCEL_PROJECT_ID=$(echo $PROJECT_INFO | jq -r '.id')" >> $GITHUB_ENV
           echo "VERCEL_ORG_ID=$(echo $PROJECT_INFO | jq -r '.accountId')" >> $GITHUB_ENV
+
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN
 
       - name: Write Firebase env vars for build
         run: |
@@ -38,7 +43,7 @@ jobs:
           echo "VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}" >> .env.production.local
 
       - name: Build project
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod --token=$VERCEL_TOKEN
 
       - name: Deploy to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
