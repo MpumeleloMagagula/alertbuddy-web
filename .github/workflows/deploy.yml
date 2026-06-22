@@ -5,10 +5,6 @@ on:
     branches:
       - main
 
-env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -23,6 +19,13 @@ jobs:
 
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
+
+      - name: Fetch Vercel project and org IDs
+        run: |
+          PROJECT_INFO=$(curl -s "https://api.vercel.com/v9/projects/alertbuddy-web" \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}")
+          echo "VERCEL_PROJECT_ID=$(echo $PROJECT_INFO | jq -r '.id')" >> $GITHUB_ENV
+          echo "VERCEL_ORG_ID=$(echo $PROJECT_INFO | jq -r '.accountId')" >> $GITHUB_ENV
 
       - name: Write Firebase env vars for build
         run: |
