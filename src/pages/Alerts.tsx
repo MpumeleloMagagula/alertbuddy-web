@@ -40,17 +40,16 @@ export default function Alerts() {
     title: '',
     message: '',
     severity: 'WARNING' as Severity,
-    channelId: 'test-channel',
-    channelName: 'Test Channel',
+    channelId: 'core-monitoring',
+    channelName: 'Core Services Monitoring',
   });
 
   const channels = [
-    { id: 'infinity-dal-ms', name: 'Infinity DAL MS' },
-    { id: 'infinity-online', name: 'Infinity Online' },
-    { id: 'nemo', name: 'Nemo' },
-    { id: 'online-dal', name: 'Online DAL' },
-    { id: 'vsa-crisis', name: 'VSA IT Crisis War Room' },
-    { id: 'test-channel', name: 'Test Channel' },
+    { id: 'core-monitoring', name: 'Core Services Monitoring' },
+    { id: 'infra-alerts', name: 'Cloud Infrastructure Alerts' },
+    { id: 'api-gateway', name: 'External API Gateway' },
+    { id: 'db-health', name: 'Database Health Cluster' },
+    { id: 'crisis-response', name: 'Urgent Crisis Response' },
   ];
 
   useEffect(() => {

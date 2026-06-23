@@ -245,6 +245,32 @@ router.post('/alerts/send-topic', async (req: Request, res: Response) => {
   });
 });
 
+// Send to a specific device by FCM token
+router.post('/alerts/send-to-device', async (req: Request, res: Response) => {
+  const { fcmToken, title, message, severity, channelId, channelName } = req.body;
+
+  if (!fcmToken || !title || !message) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required fields: fcmToken, title, message',
+    });
+  }
+
+  const success = await fcm.sendToToken(
+    fcmToken,
+    { title, body: message },
+    {
+      alertId: `manual-${Date.now()}`,
+      channelId: channelId || 'general',
+      channelName: channelName || 'General',
+      severity: severity || 'WARNING',
+      source: 'Manual',
+    }
+  );
+
+  res.json({ success, sentTo: fcmToken.slice(0, 20) + '...' });
+});
+
 // ========== Grafana Webhook ==========
 router.post('/grafana/webhook', async (req: Request, res: Response) => {
   if (!grafana.validateGrafanaPayload(req.body)) {

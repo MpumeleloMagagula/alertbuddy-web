@@ -83,6 +83,11 @@ class ApiService {
     return data;
   }
 
+  async sendToDevice(fcmToken: string, alertData: TestAlertFormData): Promise<ApiResponse> {
+    const { data } = await this.api.post<ApiResponse>('/api/alerts/send-to-device', { fcmToken, ...alertData });
+    return data;
+  }
+
   async sendStandbyAlert(alertData: TestAlertFormData): Promise<ApiResponse> {
     const { data } = await this.api.post<ApiResponse>('/api/alerts/send-standby', alertData);
     return data;
