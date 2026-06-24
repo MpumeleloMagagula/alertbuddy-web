@@ -82,8 +82,9 @@ export async function sendToToken(
       android: {
         priority: 'high',
         notification: {
-          channelId: 'alert_buddy_alerts',
+          channelId: data.channelId,
           priority: 'max' as any,
+          sound: 'default',
           defaultSound: true,
           defaultVibrateTimings: true,
         },
@@ -129,8 +130,9 @@ export async function sendToTopic(
       android: {
         priority: 'high',
         notification: {
-          channelId: 'alert_buddy_alerts',
+          channelId: data.channelId,
           priority: 'max' as any,
+          sound: 'default',
           defaultSound: true,
           defaultVibrateTimings: true,
         },
@@ -175,8 +177,9 @@ export async function sendToMultipleTokens(
     android: {
       priority: 'high',
       notification: {
-        channelId: 'alert_buddy_alerts',
+        channelId: data.channelId,
         priority: 'max' as any,
+        sound: 'default',
         defaultSound: true,
         defaultVibrateTimings: true,
       },
