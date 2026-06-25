@@ -62,6 +62,8 @@ export interface Device {
   userId: string;
   fcmToken: string;
   email: string;
+  deviceName?: string;
+  manufacturer?: string;
   deviceModel?: string;
   osVersion?: string;
   appVersion?: string;

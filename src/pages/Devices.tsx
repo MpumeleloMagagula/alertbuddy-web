@@ -14,6 +14,12 @@ import {
   Send,
   ChevronDown,
   ChevronUp,
+  Info,
+  X,
+  Copy,
+  Building2,
+  User,
+  Cpu,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../services/api';
@@ -46,12 +52,181 @@ const defaultForm = (): NotifyForm => ({
   severity: 'WARNING',
 });
 
+function nameFromEmail(email: string): string {
+  const local = email.split('@')[0];
+  return local
+    .split(/[._\-+]/)
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function orgFromEmail(email: string): string {
+  const domain = email.split('@')[1] || '';
+  const org = domain.split('.')[0] || '';
+  return org.charAt(0).toUpperCase() + org.slice(1);
+}
+
+function initialsFromEmail(email: string): string {
+  const parts = email.split('@')[0].split(/[._\-+]/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return (parts[0]?.[0] || '?').toUpperCase();
+}
+
+function DetailModal({ device, onClose }: { device: Device; onClose: () => void }) {
+  const onlineStatus = (() => {
+    const mins = (Date.now() - device.lastSeen) / 1000 / 60;
+    if (mins < 5) return { color: 'bg-green-500', text: 'Online', textColor: 'text-green-600 dark:text-green-400' };
+    if (mins < 30) return { color: 'bg-yellow-500', text: 'Away', textColor: 'text-yellow-600 dark:text-yellow-400' };
+    return { color: 'bg-gray-400', text: 'Offline', textColor: 'text-gray-500 dark:text-gray-400' };
+  })();
+
+  const batteryColor = !device.batteryLevel
+    ? 'text-gray-400'
+    : device.batteryLevel < 20
+      ? 'text-red-600'
+      : device.batteryLevel < 50
+        ? 'text-orange-500'
+        : 'text-green-600';
+
+  const copy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied`);
+  };
+
+  const displayName = nameFromEmail(device.email);
+  const org = orgFromEmail(device.email);
+  const initials = initialsFromEmail(device.email);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Device Details</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* Person info */}
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-primary-600 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{displayName}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{device.email}</p>
+              {org && (
+                <div className="flex items-center gap-1 mt-1">
+                  <Building2 className="w-3 h-3 text-gray-400" />
+                  <span className="text-xs text-gray-400">{org}</span>
+                </div>
+              )}
+            </div>
+            <div className="ml-auto flex-shrink-0 flex items-center gap-1.5">
+              <span className={`w-2.5 h-2.5 rounded-full ${onlineStatus.color}`}></span>
+              <span className={`text-sm font-medium ${onlineStatus.textColor}`}>{onlineStatus.text}</span>
+            </div>
+          </div>
+
+          {/* Device info */}
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3 flex items-center gap-2">
+              <Smartphone className="w-3.5 h-3.5" /> Device
+            </h3>
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-700">
+              {device.deviceName && (
+                <Row label="Device Name" value={device.deviceName} />
+              )}
+              {device.manufacturer && (
+                <Row label="Manufacturer" value={device.manufacturer} />
+              )}
+              {device.deviceModel && (
+                <Row label="Model" value={device.deviceModel} />
+              )}
+              {device.osVersion && (
+                <Row label="OS Version" value={device.osVersion} />
+              )}
+              {device.appVersion && (
+                <Row label="App Version" value={`v${device.appVersion}`} />
+              )}
+              {!device.deviceName && !device.manufacturer && !device.deviceModel && !device.osVersion && !device.appVersion && (
+                <p className="px-4 py-3 text-sm text-gray-400 italic">No device info — update the Android app to send this data</p>
+              )}
+            </div>
+          </div>
+
+          {/* Status */}
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3 flex items-center gap-2">
+              <Cpu className="w-3.5 h-3.5" /> Status
+            </h3>
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-700">
+              {device.batteryLevel != null ? (
+                <Row
+                  label="Battery"
+                  value={`${device.batteryLevel}%${device.isCharging ? ' (Charging)' : ''}`}
+                  valueClass={batteryColor}
+                />
+              ) : (
+                <Row label="Battery" value="Unknown" />
+              )}
+              <Row label="Last Seen" value={new Date(device.lastSeen).toLocaleString()} />
+              <Row label="Registered" value={new Date(device.registeredAt).toLocaleString()} />
+            </div>
+          </div>
+
+          {/* Technical */}
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3 flex items-center gap-2">
+              <User className="w-3.5 h-3.5" /> Technical
+            </h3>
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-700">
+              <CopyRow label="Device ID" value={device.deviceId} onCopy={() => copy(device.deviceId, 'Device ID')} />
+              <CopyRow label="FCM Token" value={device.fcmToken} onCopy={() => copy(device.fcmToken, 'FCM Token')} truncate />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 gap-4">
+      <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">{label}</span>
+      <span className={`text-sm font-medium text-right ${valueClass || 'text-gray-900 dark:text-white'}`}>{value}</span>
+    </div>
+  );
+}
+
+function CopyRow({ label, value, onCopy, truncate }: { label: string; value: string; onCopy: () => void; truncate?: boolean }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 gap-4">
+      <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">{label}</span>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={`text-xs font-mono text-gray-700 dark:text-gray-300 ${truncate ? 'truncate max-w-[180px]' : ''}`}>{value}</span>
+        <button type="button" onClick={onCopy} aria-label="Copy" className="flex-shrink-0 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors">
+          <Copy className="w-3.5 h-3.5 text-gray-400" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Devices() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedDeviceId, setExpandedDeviceId] = useState<string | null>(null);
   const [notifyForm, setNotifyForm] = useState<NotifyForm>(defaultForm());
   const [isSending, setIsSending] = useState(false);
+  const [detailDevice, setDetailDevice] = useState<Device | null>(null);
 
   useEffect(() => {
     const unsubscribe = firebase.onDevicesChange((updatedDevices) => {
@@ -105,9 +280,7 @@ export default function Devices() {
   };
 
   const handleDeleteDevice = async (deviceId: string) => {
-    if (!confirm('Are you sure you want to unregister this device?')) {
-      return;
-    }
+    if (!confirm('Are you sure you want to unregister this device?')) return;
 
     try {
       await api.unregisterDevice(deviceId);
@@ -120,60 +293,33 @@ export default function Devices() {
 
   const getBatteryIcon = (level?: number, isCharging?: boolean) => {
     if (!level) return Battery;
-
-    if (isCharging) {
-      return BatteryFull;
-    }
-
-    if (level < 20) {
-      return BatteryLow;
-    } else if (level < 50) {
-      return BatteryMedium;
-    } else {
-      return BatteryFull;
-    }
+    if (isCharging) return BatteryFull;
+    if (level < 20) return BatteryLow;
+    if (level < 50) return BatteryMedium;
+    return BatteryFull;
   };
 
   const getBatteryColor = (level?: number) => {
     if (!level) return 'text-gray-400';
-
-    if (level < 20) {
-      return 'text-red-600';
-    } else if (level < 50) {
-      return 'text-orange-500';
-    } else {
-      return 'text-green-600';
-    }
+    if (level < 20) return 'text-red-600';
+    if (level < 50) return 'text-orange-500';
+    return 'text-green-600';
   };
 
   const getOnlineStatus = (lastSeen: number) => {
-    const minutesSinceLastSeen = (Date.now() - lastSeen) / 1000 / 60;
-
-    if (minutesSinceLastSeen < 5) {
-      return { status: 'online', color: 'bg-green-500', text: 'Online' };
-    } else if (minutesSinceLastSeen < 30) {
-      return { status: 'away', color: 'bg-yellow-500', text: 'Away' };
-    } else {
-      return { status: 'offline', color: 'bg-gray-400', text: 'Offline' };
-    }
+    const mins = (Date.now() - lastSeen) / 1000 / 60;
+    if (mins < 5) return { status: 'online', color: 'bg-green-500', text: 'Online' };
+    if (mins < 30) return { status: 'away', color: 'bg-yellow-500', text: 'Away' };
+    return { status: 'offline', color: 'bg-gray-400', text: 'Offline' };
   };
 
   const getLastSeenText = (lastSeen: number) => {
     const minutesAgo = Math.floor((Date.now() - lastSeen) / 1000 / 60);
-
-    if (minutesAgo < 1) {
-      return 'Just now';
-    } else if (minutesAgo < 60) {
-      return `${minutesAgo} minute${minutesAgo !== 1 ? 's' : ''} ago`;
-    } else {
-      const hoursAgo = Math.floor(minutesAgo / 60);
-      if (hoursAgo < 24) {
-        return `${hoursAgo} hour${hoursAgo !== 1 ? 's' : ''} ago`;
-      } else {
-        const daysAgo = Math.floor(hoursAgo / 24);
-        return `${daysAgo} day${daysAgo !== 1 ? 's' : ''} ago`;
-      }
-    }
+    if (minutesAgo < 1) return 'Just now';
+    if (minutesAgo < 60) return `${minutesAgo}m ago`;
+    const hoursAgo = Math.floor(minutesAgo / 60);
+    if (hoursAgo < 24) return `${hoursAgo}h ago`;
+    return `${Math.floor(hoursAgo / 24)}d ago`;
   };
 
   if (isLoading) {
@@ -189,6 +335,8 @@ export default function Devices() {
 
   return (
     <div className="space-y-6">
+      {detailDevice && <DetailModal device={detailDevice} onClose={() => setDetailDevice(null)} />}
+
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
@@ -267,78 +415,61 @@ export default function Devices() {
               const BatteryIcon = getBatteryIcon(device.batteryLevel, device.isCharging);
               const batteryColor = getBatteryColor(device.batteryLevel);
               const isExpanded = expandedDeviceId === device.id;
+              const displayName = nameFromEmail(device.email);
 
               return (
-                <div
-                  key={device.id}
-                  className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                >
+                <div key={device.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <div className="flex items-start gap-4">
-                    {/* Device icon */}
-                    <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Smartphone className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                    {/* Avatar */}
+                    <div className="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {initialsFromEmail(device.email)}
                     </div>
 
-                    {/* Device info */}
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-gray-900 dark:text-white truncate">
-                          {device.email}
-                        </p>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="font-semibold text-gray-900 dark:text-white">{displayName}</p>
                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${onlineStatus.color}`}></span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {onlineStatus.text}
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{onlineStatus.text}</span>
+                      </div>
+
+                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{device.email}</p>
+
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        {(device.deviceName || device.deviceModel) && (
+                          <span className="flex items-center gap-1">
+                            <Smartphone className="w-3 h-3" />
+                            {device.deviceName || device.deviceModel}
+                          </span>
+                        )}
+                        {device.osVersion && <span>{device.osVersion}</span>}
+                        {device.batteryLevel != null && (
+                          <span className={`flex items-center gap-1 ${batteryColor}`}>
+                            <BatteryIcon className="w-3 h-3" />
+                            {device.batteryLevel}%{device.isCharging ? ' ⚡' : ''}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {getLastSeenText(device.lastSeen)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          {new Date(device.registeredAt).toLocaleDateString()}
                         </span>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                        {device.deviceModel && (
-                          <span className="flex items-center gap-1">
-                            <Smartphone className="w-3 h-3" />
-                            {device.deviceModel}
-                          </span>
-                        )}
-                        {device.osVersion && (
-                          <span>OS: {device.osVersion}</span>
-                        )}
-                        {device.appVersion && (
-                          <span>App: v{device.appVersion}</span>
-                        )}
-                      </div>
-
-                      {/* Health indicators */}
-                      <div className="flex flex-wrap items-center gap-4 mt-3">
-                        {device.batteryLevel !== undefined && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <BatteryIcon className={`w-4 h-4 ${batteryColor}`} />
-                            <span className={batteryColor}>
-                              {device.batteryLevel}%
-                              {device.isCharging && ' (Charging)'}
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                          <Clock className="w-4 h-4" />
-                          <span>Last seen: {getLastSeenText(device.lastSeen)}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Registered: {new Date(device.registeredAt).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-
-                      {/* FCM Token */}
-                      <div className="mt-3 p-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">FCM Token</p>
-                        <p className="text-xs font-mono text-gray-600 dark:text-gray-300 truncate">
-                          {device.fcmToken}
-                        </p>
-                      </div>
-
                       {/* Actions */}
-                      <div className="flex gap-2 mt-3">
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setDetailDevice(device)}
+                          className="btn-secondary text-sm flex items-center gap-1"
+                        >
+                          <Info className="w-4 h-4" />
+                          View Details
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => toggleNotifyForm(device.id)}
@@ -363,13 +494,11 @@ export default function Devices() {
                       {isExpanded && (
                         <div className="mt-4 p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 space-y-3">
                           <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                            Send notification to {device.email}
+                            Send notification to {displayName}
                           </p>
 
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              Title
-                            </label>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Title</label>
                             <input
                               type="text"
                               value={notifyForm.title}
@@ -380,9 +509,7 @@ export default function Devices() {
                           </div>
 
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              Message
-                            </label>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Message</label>
                             <textarea
                               value={notifyForm.message}
                               onChange={e => setNotifyForm(f => ({ ...f, message: e.target.value }))}
@@ -394,9 +521,7 @@ export default function Devices() {
 
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                Channel
-                              </label>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Channel</label>
                               <select
                                 value={notifyForm.channelId}
                                 onChange={e => handleChannelChange(e.target.value)}
@@ -408,11 +533,8 @@ export default function Devices() {
                                 ))}
                               </select>
                             </div>
-
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                Severity
-                              </label>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Severity</label>
                               <select
                                 value={notifyForm.severity}
                                 onChange={e => setNotifyForm(f => ({ ...f, severity: e.target.value }))}
@@ -461,12 +583,10 @@ export default function Devices() {
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-orange-900 dark:text-orange-300">
-                Low Battery Warning
-              </p>
+              <p className="font-semibold text-orange-900 dark:text-orange-300">Low Battery Warning</p>
               <p className="text-sm text-orange-700 dark:text-orange-400 mt-1">
                 {devices.filter(d => d.batteryLevel && d.batteryLevel < 20).length} device(s) have low battery.
-                They may not receive alerts reliably. Users should charge their devices.
+                They may not receive alerts reliably.
               </p>
             </div>
           </div>

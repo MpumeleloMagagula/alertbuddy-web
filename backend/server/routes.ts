@@ -25,7 +25,7 @@ router.get('/status', (_req: Request, res: Response) => {
 
 // ========== Device Management ==========
 router.post('/devices/register', async (req: Request, res: Response) => {
-  const { deviceId, fcmToken, email, deviceModel, osVersion, appVersion, batteryLevel, isCharging } = req.body;
+  const { deviceId, fcmToken, email, deviceName, manufacturer, deviceModel, osVersion, appVersion, batteryLevel, isCharging } = req.body;
 
   if (!deviceId || !fcmToken || !email) {
     return res.status(400).json({
@@ -43,6 +43,8 @@ router.post('/devices/register', async (req: Request, res: Response) => {
         deviceId,
         fcmToken,
         email,
+        deviceName: deviceName ?? null,
+        manufacturer: manufacturer ?? null,
         deviceModel: deviceModel ?? null,
         osVersion: osVersion ?? null,
         appVersion: appVersion ?? null,
