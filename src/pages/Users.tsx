@@ -46,13 +46,13 @@ export default function Users() {
   const getRoleBadgeColor = (role: UserRole) => {
     switch (role) {
       case 'ADMIN':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800/50';
       case 'MANAGER':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800/50';
       case 'USER':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600';
     }
   };
 
@@ -181,7 +181,7 @@ export default function Users() {
                       <p className="text-sm text-gray-600 dark:text-gray-400">{user.email}</p>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`badge ${getRoleBadgeColor(user.role)} dark:bg-opacity-20`}>
+                      <span className={`badge ${getRoleBadgeColor(user.role)}`}>
                         {user.role}
                       </span>
                     </td>
