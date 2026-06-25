@@ -1,58 +1,73 @@
-import { useState, useEffect } from 'react';
-import { Users as UsersIcon, Plus, Edit, Trash2, Shield } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Users as UsersIcon, Plus, Edit, Trash2, Shield, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import firebase from '../services/firebase';
-import type { User, UserRole } from '../types';
+import { UserRole } from '../types';
+import type { User } from '../types';
+
+const ROLE_FILTERS: Array<UserRole | 'ALL'> = ['ALL', UserRole.ADMIN, UserRole.MANAGER, UserRole.USER];
+
+const ROLE_PILL: Record<string, string> = {
+  ALL:                'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600',
+  [UserRole.ADMIN]:   'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60',
+  [UserRole.MANAGER]: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/60',
+  [UserRole.USER]:    'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/60',
+};
+
+const ROLE_PILL_ACTIVE: Record<string, string> = {
+  ALL:                'bg-gray-700 text-white dark:bg-gray-300 dark:text-gray-900',
+  [UserRole.ADMIN]:   'bg-red-600 text-white dark:bg-red-500',
+  [UserRole.MANAGER]: 'bg-blue-600 text-white dark:bg-blue-500',
+  [UserRole.USER]:    'bg-green-600 text-white dark:bg-green-500',
+};
 
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    // Fallback timeout in case Firebase is blocked by an adblocker (ERR_BLOCKED_BY_CLIENT)
-    const timeout = setTimeout(() => {
-      setIsLoading(false);
-    }, 5000);
-
-    // Subscribe to real-time updates
+    const timeout = setTimeout(() => setIsLoading(false), 5000);
     const unsubscribe = firebase.onUsersChange((updatedUsers) => {
       setUsers(updatedUsers);
       setIsLoading(false);
       clearTimeout(timeout);
     });
-
-    return () => {
-      unsubscribe();
-      clearTimeout(timeout);
-    };
+    return () => { unsubscribe(); clearTimeout(timeout); };
   }, []);
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) {
-      return;
+  const filteredUsers = useMemo(() => {
+    let list = users;
+    if (roleFilter !== 'ALL') list = list.filter(u => u.role === roleFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(u =>
+        u.displayName.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.department ?? '').toLowerCase().includes(q)
+      );
     }
+    return list;
+  }, [users, roleFilter, searchQuery]);
 
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
     try {
       await firebase.deleteUser(userId);
       toast.success('User deleted successfully');
-    } catch (error) {
-      console.error('Failed to delete user:', error);
+    } catch {
       toast.error('Failed to delete user');
     }
   };
 
   const getRoleBadgeColor = (role: UserRole) => {
     switch (role) {
-      case 'ADMIN':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800/50';
-      case 'MANAGER':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800/50';
-      case 'USER':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600';
+      case 'ADMIN':   return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800/50';
+      case 'MANAGER': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800/50';
+      default:        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600';
     }
   };
 
@@ -60,7 +75,7 @@ export default function Users() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto shadow-sm"></div>
+          <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto shadow-sm" />
           <p className="mt-4 text-gray-600 dark:text-gray-400">Loading users...</p>
         </div>
       </div>
@@ -75,10 +90,7 @@ export default function Users() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Alert Users</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">Manage user accounts and permissions</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="btn-primary flex items-center gap-2"
-        >
+        <button type="button" onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           Add User
         </button>
@@ -104,9 +116,7 @@ export default function Users() {
             </div>
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Admins</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">
-                {users.filter(u => u.role === 'ADMIN').length}
-              </p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{users.filter(u => u.role === 'ADMIN').length}</p>
             </div>
           </div>
         </div>
@@ -117,9 +127,7 @@ export default function Users() {
             </div>
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Managers</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">
-                {users.filter(u => u.role === 'MANAGER').length}
-              </p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{users.filter(u => u.role === 'MANAGER').length}</p>
             </div>
           </div>
         </div>
@@ -130,106 +138,146 @@ export default function Users() {
             </div>
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Active Users</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">
-                {users.filter(u => u.isActive).length}
-              </p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{users.filter(u => u.isActive).length}</p>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Filter bar */}
+      <div className="card flex flex-col sm:flex-row sm:items-center gap-4">
+        {/* Role pills */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {ROLE_FILTERS.map(role => (
+            <button
+              key={role}
+              type="button"
+              onClick={() => setRoleFilter(role)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                roleFilter === role ? ROLE_PILL_ACTIVE[role] : ROLE_PILL[role]
+              }`}
+            >
+              {role === 'ALL' ? 'All Roles' : role}
+              <span className="ml-1.5 opacity-70">
+                {role === 'ALL'
+                  ? users.length
+                  : users.filter(u => u.role === role).length}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by name, email or department…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="input pl-9 w-full"
+          />
+        </div>
+      </div>
+
       {/* Users table */}
       <div className="card">
-        {users.length === 0 ? (
+        {filteredUsers.length === 0 ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <UsersIcon className="w-12 h-12 mx-auto mb-3 text-gray-400 dark:text-gray-600" />
-            <p>No users found</p>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn-primary mt-4"
-            >
-              Add Your First User
-            </button>
+            {users.length === 0 ? (
+              <>
+                <p>No users found</p>
+                <button type="button" onClick={() => setShowAddModal(true)} className="btn-primary mt-4">
+                  Add Your First User
+                </button>
+              </>
+            ) : (
+              <p>No users match the current filter</p>
+            )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-800">
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Name</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Email</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Role</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Department</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Created</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
-                  >
-                    <td className="py-3 px-4">
-                      <p className="font-medium text-gray-900 dark:text-white">{user.displayName}</p>
-                      {user.position && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{user.position}</p>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{user.email}</p>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`badge ${getRoleBadgeColor(user.role)}`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{user.department || '-'}</p>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`badge ${user.isActive ? 'badge-success' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'}`}>
-                        {user.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {new Date(user.createdAt).toLocaleDateString()}
-                      </p>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => setEditingUser(user)}
-                          className="text-primary-600 hover:text-primary-700 p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
-                          title="Edit user"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="text-red-600 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                          title="Delete user"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+          <>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Showing <span className="font-semibold text-gray-700 dark:text-gray-300">{filteredUsers.length}</span> of{' '}
+              <span className="font-semibold text-gray-700 dark:text-gray-300">{users.length}</span> users
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-gray-800">
+                    {['Name', 'Email', 'Role', 'Department', 'Status', 'Created', 'Actions'].map((h, i) => (
+                      <th
+                        key={h}
+                        className={`py-3 px-4 text-sm font-semibold text-gray-700 dark:text-gray-300 ${i === 6 ? 'text-right' : 'text-left'}`}
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((user) => (
+                    <tr
+                      key={user.id}
+                      className="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
+                    >
+                      <td className="py-3 px-4">
+                        <p className="font-medium text-gray-900 dark:text-white">{user.displayName}</p>
+                        {user.position && <p className="text-xs text-gray-500 dark:text-gray-400">{user.position}</p>}
+                      </td>
+                      <td className="py-3 px-4">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{user.email}</p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`badge ${getRoleBadgeColor(user.role)}`}>{user.role}</span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{user.department || '-'}</p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`badge ${user.isActive ? 'badge-success' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'}`}>
+                          {user.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {new Date(user.createdAt).toLocaleDateString()}
+                        </p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingUser(user)}
+                            className="text-primary-600 hover:text-primary-700 p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                            title="Edit user"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="text-red-600 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            title="Delete user"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
       {/* Info box */}
       <div className="card bg-primary-50 dark:bg-primary-900/10 border-primary-200 dark:border-primary-800/50">
         <div className="flex gap-3">
-          <div className="flex-shrink-0">
-            <Shield className="w-5 h-5 text-primary-600 dark:text-primary-400" />
-          </div>
+          <Shield className="w-5 h-5 text-primary-600 dark:text-primary-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-primary-900 dark:text-primary-300">
             <p className="font-semibold mb-1 text-primary-950 dark:text-primary-200">User Roles Explained</p>
             <ul className="space-y-1 list-disc list-inside text-primary-800 dark:text-primary-400">
@@ -241,9 +289,9 @@ export default function Users() {
         </div>
       </div>
 
-      {/* Add/Edit User Modal - Placeholder */}
+      {/* Add/Edit User Modal */}
       {(showAddModal || editingUser) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
               {editingUser ? 'Edit User' : 'Add New User'}
@@ -251,17 +299,13 @@ export default function Users() {
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               User management forms will be implemented with Firebase Authentication integration.
             </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  setEditingUser(null);
-                }}
-                className="btn-secondary flex-1"
-              >
-                Close
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => { setShowAddModal(false); setEditingUser(null); }}
+              className="btn-secondary w-full"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

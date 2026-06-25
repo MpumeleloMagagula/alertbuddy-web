@@ -164,7 +164,7 @@ router.delete('/standby', (_req: Request, res: Response) => {
 });
 
 router.get('/standby/history', (req: Request, res: Response) => {
-  const limit = parseInt(req.query.limit as string) || 20;
+  const limit = Number.parseInt(req.query.limit as string) || 20;
   const history = standbyStorage.getHandoverHistory(limit);
   res.json(history);
 });
@@ -305,6 +305,79 @@ router.post('/alerts/send-to-device', async (req: Request, res: Response) => {
   }
 
   res.json({ success, sentTo: fcmToken.slice(0, 20) + '...' });
+});
+
+// ========== Alert Acknowledgment / Management ==========
+
+// Called by the Android app when a user opens/acknowledges an alert
+router.post('/alerts/:alertId/acknowledge', async (req: Request, res: Response) => {
+  const { alertId } = req.params;
+  const { acknowledgedBy, acknowledgedAt } = req.body;
+
+  if (!admin.apps.length) {
+    return res.status(503).json({ success: false, error: 'Firebase not available' });
+  }
+
+  try {
+    await admin.firestore().collection('alerts').doc(alertId).update({
+      isRead: true,
+      acknowledgedBy: acknowledgedBy ?? null,
+      acknowledgedAt: acknowledgedAt ?? Date.now(),
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to acknowledge alert:', err);
+    res.status(500).json({ success: false, error: 'Failed to update alert' });
+  }
+});
+
+router.post('/alerts/bulk-mark-read', async (req: Request, res: Response) => {
+  const { alertIds } = req.body as { alertIds: string[] };
+
+  if (!Array.isArray(alertIds) || alertIds.length === 0) {
+    return res.status(400).json({ success: false, error: 'alertIds array required' });
+  }
+  if (!admin.apps.length) {
+    return res.status(503).json({ success: false, error: 'Firebase not available' });
+  }
+
+  try {
+    const batch = admin.firestore().batch();
+    alertIds.forEach(id => {
+      batch.update(admin.firestore().collection('alerts').doc(id), {
+        isRead: true,
+        acknowledgedAt: Date.now(),
+      });
+    });
+    await batch.commit();
+    res.json({ success: true, updated: alertIds.length });
+  } catch (err) {
+    console.error('Bulk mark-read error:', err);
+    res.status(500).json({ success: false, error: 'Failed to update alerts' });
+  }
+});
+
+router.post('/alerts/bulk-delete', async (req: Request, res: Response) => {
+  const { alertIds } = req.body as { alertIds: string[] };
+
+  if (!Array.isArray(alertIds) || alertIds.length === 0) {
+    return res.status(400).json({ success: false, error: 'alertIds array required' });
+  }
+  if (!admin.apps.length) {
+    return res.status(503).json({ success: false, error: 'Firebase not available' });
+  }
+
+  try {
+    const batch = admin.firestore().batch();
+    alertIds.forEach(id => {
+      batch.delete(admin.firestore().collection('alerts').doc(id));
+    });
+    await batch.commit();
+    res.json({ success: true, deleted: alertIds.length });
+  } catch (err) {
+    console.error('Bulk delete error:', err);
+    res.status(500).json({ success: false, error: 'Failed to delete alerts' });
+  }
 });
 
 // ========== Grafana Webhook ==========
