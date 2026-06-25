@@ -78,6 +78,9 @@ export async function sendToToken(
         channelName: data.channelName,
         severity: data.severity,
         source: data.source,
+        title: notification.title,
+        body: notification.body,
+        message: notification.body,
       },
       android: {
         priority: 'high',
@@ -126,6 +129,9 @@ export async function sendToTopic(
         channelName: data.channelName,
         severity: data.severity,
         source: data.source,
+        title: notification.title,
+        body: notification.body,
+        message: notification.body,
       },
       android: {
         priority: 'high',
@@ -173,6 +179,9 @@ export async function sendToMultipleTokens(
       channelName: data.channelName,
       severity: data.severity,
       source: data.source,
+      title: notification.title,
+      body: notification.body,
+      message: notification.body,
     },
     android: {
       priority: 'high',
