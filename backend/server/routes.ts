@@ -7,6 +7,33 @@ import * as grafana from './grafana.js';
 
 const router = Router();
 
+// ========== Firestore Alert Helper ==========
+async function saveAlertToFirestore(params: {
+  alertId: string;
+  title: string;
+  body: string;
+  severity: string;
+  channelId: string;
+  channelName: string;
+  source: string;
+}) {
+  if (!admin.apps.length) return;
+  try {
+    await admin.firestore().collection('alerts').doc(params.alertId).set({
+      channelId: params.channelId,
+      channelName: params.channelName,
+      title: params.title,
+      body: params.body,
+      severity: params.severity,
+      timestamp: Date.now(),
+      isRead: false,
+      source: params.source,
+    });
+  } catch (err) {
+    console.error('Failed to save alert to Firestore:', err);
+  }
+}
+
 // ========== Server Status ==========
 router.get('/status', (_req: Request, res: Response) => {
   const standby = standbyStorage.getCurrentStandby();
@@ -162,17 +189,18 @@ router.post('/alerts/send', async (req: Request, res: Response) => {
     });
   }
 
+  const alertId = `manual-${Date.now()}`;
+  const resolvedChannelId = channelId || 'general';
+  const resolvedChannelName = channelName || 'General';
+  const resolvedSeverity = severity || 'WARNING';
+
   const result = await fcm.sendToMultipleTokens(
     tokens,
     { title, body: message },
-    {
-      alertId: `manual-${Date.now()}`,
-      channelId: channelId || 'general',
-      channelName: channelName || 'General',
-      severity: severity || 'WARNING',
-      source: 'Manual',
-    }
+    { alertId, channelId: resolvedChannelId, channelName: resolvedChannelName, severity: resolvedSeverity, source: 'Manual' }
   );
+
+  await saveAlertToFirestore({ alertId, title, body: message, severity: resolvedSeverity, channelId: resolvedChannelId, channelName: resolvedChannelName, source: 'Manual' });
 
   res.json({
     success: true,
@@ -201,17 +229,20 @@ router.post('/alerts/send-standby', async (req: Request, res: Response) => {
     });
   }
 
+  const alertId = `manual-${Date.now()}`;
+  const resolvedChannelId = channelId || 'general';
+  const resolvedChannelName = channelName || 'General';
+  const resolvedSeverity = severity || 'WARNING';
+
   const success = await fcm.sendToToken(
     standby.fcmToken,
     { title, body: message },
-    {
-      alertId: `manual-${Date.now()}`,
-      channelId: channelId || 'general',
-      channelName: channelName || 'General',
-      severity: severity || 'WARNING',
-      source: 'Manual',
-    }
+    { alertId, channelId: resolvedChannelId, channelName: resolvedChannelName, severity: resolvedSeverity, source: 'Manual' }
   );
+
+  if (success) {
+    await saveAlertToFirestore({ alertId, title, body: message, severity: resolvedSeverity, channelId: resolvedChannelId, channelName: resolvedChannelName, source: 'Manual' });
+  }
 
   res.json({
     success,
@@ -258,17 +289,20 @@ router.post('/alerts/send-to-device', async (req: Request, res: Response) => {
     });
   }
 
+  const alertId = `manual-${Date.now()}`;
+  const resolvedChannelId = channelId || 'general';
+  const resolvedChannelName = channelName || 'General';
+  const resolvedSeverity = severity || 'WARNING';
+
   const success = await fcm.sendToToken(
     fcmToken,
     { title, body: message },
-    {
-      alertId: `manual-${Date.now()}`,
-      channelId: channelId || 'general',
-      channelName: channelName || 'General',
-      severity: severity || 'WARNING',
-      source: 'Manual',
-    }
+    { alertId, channelId: resolvedChannelId, channelName: resolvedChannelName, severity: resolvedSeverity, source: 'Manual' }
   );
+
+  if (success) {
+    await saveAlertToFirestore({ alertId, title, body: message, severity: resolvedSeverity, channelId: resolvedChannelId, channelName: resolvedChannelName, source: 'Manual' });
+  }
 
   res.json({ success, sentTo: fcmToken.slice(0, 20) + '...' });
 });
