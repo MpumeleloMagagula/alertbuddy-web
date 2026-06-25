@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { 
-  Bell, 
-  Send, 
-  TestTube, 
-  Clock, 
-  AlertCircle, 
-  AlertTriangle, 
+import {
+  Bell,
+  Send,
+  TestTube,
+  Clock,
+  AlertCircle,
+  AlertTriangle,
   Info,
   Search,
   Filter,
@@ -14,12 +14,14 @@ import {
   Trash2,
   CheckCircle2,
   XCircle,
-  UserCheck
+  UserCheck,
+  FileBarChart,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../services/api';
 import firebase from '../services/firebase';
 import type { Alert, TestAlertFormData, Severity } from '../types';
+import AlertExportModal from '../components/AlertExportModal';
 
 export default function Alerts() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -34,6 +36,7 @@ export default function Alerts() {
   
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showExport, setShowExport] = useState(false);
 
   // Form state
   const [testAlert, setTestAlert] = useState<TestAlertFormData>({
@@ -257,6 +260,10 @@ export default function Alerts() {
 
   return (
     <div className="space-y-6">
+      {showExport && (
+        <AlertExportModal alerts={alerts} onClose={() => setShowExport(false)} />
+      )}
+
       {/* Page header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Alerts</h1>
@@ -301,6 +308,7 @@ export default function Alerts() {
                   <select
                     value={testAlert.severity}
                     onChange={(e) => setTestAlert({ ...testAlert, severity: e.target.value as Severity })}
+                    title="Severity"
                     className="input"
                     disabled={isSending}
                   >
@@ -317,6 +325,7 @@ export default function Alerts() {
                       const channel = channels.find(c => c.id === e.target.value);
                       setTestAlert({ ...testAlert, channelId: e.target.value, channelName: channel?.name || '' });
                     }}
+                    title="Channel"
                     className="input"
                     disabled={isSending}
                   >
@@ -326,13 +335,13 @@ export default function Alerts() {
               </div>
 
               <div className="flex flex-col gap-2 pt-2">
-                <button onClick={handleSendToAll} disabled={isSending} className="btn-primary w-full flex items-center justify-center gap-2">
+                <button type="button" onClick={handleSendToAll} disabled={isSending} className="btn-primary w-full flex items-center justify-center gap-2">
                   <Send className="w-4 h-4" /> Send to All
                 </button>
-                <button onClick={handleSendToStandby} disabled={isSending} className="btn-secondary w-full flex items-center justify-center gap-2">
+                <button type="button" onClick={handleSendToStandby} disabled={isSending} className="btn-secondary w-full flex items-center justify-center gap-2">
                   <UserCheck className="w-4 h-4" /> Send to Standby
                 </button>
-                <button onClick={handleTestGrafanaWebhook} disabled={isSending} className="btn-secondary w-full flex items-center justify-center gap-2">
+                <button type="button" onClick={handleTestGrafanaWebhook} disabled={isSending} className="btn-secondary w-full flex items-center justify-center gap-2">
                   <TestTube className="w-4 h-4" /> Test Webhook
                 </button>
               </div>
@@ -369,13 +378,13 @@ export default function Alerts() {
               </div>
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-gray-400" />
-                <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="input w-32">
+                <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} title="Filter by severity" className="input w-32">
                   <option value="ALL">All Sev</option>
                   <option value="CRITICAL">Critical</option>
                   <option value="WARNING">Warning</option>
                   <option value="INFO">Info</option>
                 </select>
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input w-32">
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} title="Filter by status" className="input w-32">
                   <option value="ALL">All Status</option>
                   <option value="READ">Read</option>
                   <option value="UNREAD">Unread</option>
@@ -390,15 +399,15 @@ export default function Alerts() {
                   <span className="text-sm font-medium text-primary-700 dark:text-primary-400">
                     {selectedIds.size} selected
                   </span>
-                  <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-500 hover:text-gray-700">
+                  <button type="button" onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-500 hover:text-gray-700">
                     Deselect all
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={handleBulkMarkRead} className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5">
+                  <button type="button" onClick={handleBulkMarkRead} className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Mark Read
                   </button>
-                  <button onClick={handleBulkDelete} className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 py-1.5 px-3 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
+                  <button type="button" onClick={handleBulkDelete} className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 py-1.5 px-3 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
                     <Trash2 className="w-3.5 h-3.5" /> Delete
                   </button>
                 </div>
@@ -410,16 +419,27 @@ export default function Alerts() {
           <div className="card min-h-[400px]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Alert History</h2>
-              <button 
-                onClick={toggleSelectAll}
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
-              >
-                {selectedIds.size === filteredAlerts.length && filteredAlerts.length > 0 ? (
-                  <><XCircle className="w-4 h-4" /> Deselect All</>
-                ) : (
-                  <><CheckSquare className="w-4 h-4" /> Select All</>
-                )}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowExport(true)}
+                  className="btn-secondary text-sm flex items-center gap-2"
+                >
+                  <FileBarChart className="w-4 h-4" />
+                  Export Report
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+                >
+                  {selectedIds.size === filteredAlerts.length && filteredAlerts.length > 0 ? (
+                    <><XCircle className="w-4 h-4" /> Deselect All</>
+                  ) : (
+                    <><CheckSquare className="w-4 h-4" /> Select All</>
+                  )}
+                </button>
+              </div>
             </div>
 
             {filteredAlerts.length === 0 ? (
