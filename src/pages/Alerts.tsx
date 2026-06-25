@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Bell,
   Send,
@@ -38,6 +38,10 @@ export default function Alerts() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showExport, setShowExport] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   // Form state
   const [testAlert, setTestAlert] = useState<TestAlertFormData>({
     title: '',
@@ -74,6 +78,7 @@ export default function Alerts() {
 
   useEffect(() => {
     applyFilters();
+    setCurrentPage(1);
   }, [alerts, searchQuery, severityFilter, statusFilter]);
 
   const applyFilters = () => {
@@ -100,6 +105,28 @@ export default function Alerts() {
 
     setFilteredAlerts(filtered);
   };
+
+  const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / pageSize));
+  const paginatedAlerts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAlerts.slice(start, start + pageSize);
+  }, [filteredAlerts, currentPage, pageSize]);
+
+  const pageNumbers = useMemo(() => {
+    const pages: (number | 'ellipsis')[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('ellipsis');
+      for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+        pages.push(i);
+      }
+      if (currentPage < totalPages - 2) pages.push('ellipsis');
+      pages.push(totalPages);
+    }
+    return pages;
+  }, [currentPage, totalPages]);
 
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredAlerts.length) {
@@ -449,7 +476,7 @@ export default function Alerts() {
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredAlerts.map((alert) => (
+                {paginatedAlerts.map((alert) => (
                   <div
                     key={alert.id}
                     onClick={() => toggleSelect(alert.id)}
@@ -510,6 +537,72 @@ export default function Alerts() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {filteredAlerts.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5 pt-4 border-t border-gray-100 dark:border-gray-800">
+                {/* Left: count + page size */}
+                <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                  <span>
+                    Showing{' '}
+                    <span className="font-semibold text-gray-700 dark:text-gray-300">
+                      {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredAlerts.length)}
+                    </span>{' '}
+                    of{' '}
+                    <span className="font-semibold text-gray-700 dark:text-gray-300">{filteredAlerts.length}</span>{' '}
+                    alerts
+                  </span>
+                  <select
+                    value={pageSize}
+                    title="Rows per page"
+                    onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                    className="input py-1 px-2 text-xs w-20"
+                  >
+                    {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n} / page</option>)}
+                  </select>
+                </div>
+
+                {/* Right: page buttons */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-2.5 py-1.5 rounded-lg text-sm font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ‹ Prev
+                  </button>
+
+                  {pageNumbers.map((page, i) =>
+                    page === 'ellipsis' ? (
+                      <span key={`ellipsis-${i < pageNumbers.indexOf('ellipsis') ? 'start' : 'end'}`} className="px-2 text-gray-400 text-sm select-none">…</span>
+                    ) : (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                          page === currentPage
+                            ? 'bg-primary-600 text-white shadow-sm'
+                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-2.5 py-1.5 rounded-lg text-sm font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next ›
+                  </button>
+                </div>
               </div>
             )}
           </div>
