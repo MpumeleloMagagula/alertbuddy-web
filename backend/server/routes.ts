@@ -347,8 +347,11 @@ router.post('/users/invite', async (req: Request, res: Response) => {
       createdAt: Date.now(),
     }, { merge: true });
 
-    // Generate a set-password link (always returned so the portal can copy it)
-    const inviteLink = await admin.auth().generatePasswordResetLink(email);
+    // After setting their password, the user lands on the portal login page
+    const continueUrl = 'https://alertbuddy-web.vercel.app/login';
+
+    // Generate a set-password link (always returned so the portal can copy it as a fallback)
+    const inviteLink = await admin.auth().generatePasswordResetLink(email, { url: continueUrl });
 
     // Also send email via Firebase Auth REST API so the invitee gets it automatically
     const apiKey = process.env.VITE_FIREBASE_API_KEY;
@@ -360,7 +363,7 @@ router.post('/users/invite', async (req: Request, res: Response) => {
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requestType: 'PASSWORD_RESET', email }),
+            body: JSON.stringify({ requestType: 'PASSWORD_RESET', email, continueUrl }),
           }
         );
         emailSent = emailRes.ok;
