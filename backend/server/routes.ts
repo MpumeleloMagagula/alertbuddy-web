@@ -332,7 +332,7 @@ router.post('/alerts/:alertId/acknowledge', async (req: Request, res: Response) 
 });
 
 router.post('/alerts/bulk-mark-read', async (req: Request, res: Response) => {
-  const { alertIds } = req.body as { alertIds: string[] };
+  const { alertIds, userEmail } = req.body as { alertIds: string[]; userEmail?: string };
 
   if (!Array.isArray(alertIds) || alertIds.length === 0) {
     return res.status(400).json({ success: false, error: 'alertIds array required' });
@@ -342,11 +342,13 @@ router.post('/alerts/bulk-mark-read', async (req: Request, res: Response) => {
   }
 
   try {
+    const now = Date.now();
     const batch = admin.firestore().batch();
     alertIds.forEach(id => {
       batch.update(admin.firestore().collection('alerts').doc(id), {
         isRead: true,
-        acknowledgedAt: Date.now(),
+        acknowledgedAt: now,
+        acknowledgedBy: userEmail ?? null,
       });
     });
     await batch.commit();

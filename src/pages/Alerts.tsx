@@ -148,11 +148,12 @@ export default function Alerts() {
 
   const handleBulkMarkRead = async () => {
     if (selectedIds.size === 0) return;
-    
+
     try {
       setIsSending(true);
-      await api.bulkMarkAlertsRead(Array.from(selectedIds));
-      toast.success(`Marked ${selectedIds.size} alerts as read`);
+      const currentUserEmail = firebase.getCurrentUser()?.email ?? undefined;
+      await api.bulkMarkAlertsRead(Array.from(selectedIds), undefined, currentUserEmail);
+      toast.success(`Marked ${selectedIds.size} alerts as acknowledged`);
       setSelectedIds(new Set());
     } catch (error) {
       toast.error('Failed to update alerts');
@@ -529,8 +530,21 @@ export default function Alerts() {
                           {new Date(alert.timestamp).toLocaleString()}
                         </span>
                         {alert.isRead && (
-                          <span className="text-green-600 dark:text-green-400 flex items-center gap-1 font-medium">
-                            <CheckCircle2 className="w-3 h-3" /> Acknowledged
+                          <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+                            <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
+                            <span>
+                              {alert.acknowledgedBy
+                                ? <>Ack&apos;d by <strong>{alert.acknowledgedBy.split('@')[0]}</strong></>
+                                : 'Acknowledged'}
+                              {alert.acknowledgedAt && (
+                                <span className="font-normal opacity-70 ml-1">
+                                  · {new Date(alert.acknowledgedAt).toLocaleString([], {
+                                    month: 'short', day: 'numeric',
+                                    hour: '2-digit', minute: '2-digit',
+                                  })}
+                                </span>
+                              )}
+                            </span>
                           </span>
                         )}
                       </div>

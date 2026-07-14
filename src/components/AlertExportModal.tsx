@@ -152,13 +152,15 @@ export default function AlertExportModal({ alerts, onClose }: Props) {
       // ── Alert History sheet ──────────────────────────────────────────
       const history = wb.addWorksheet('Alert History');
       history.columns = [
-        { header: 'Timestamp',  key: 'ts',       width: 22 },
-        { header: 'Title',      key: 'title',     width: 36 },
-        { header: 'Message',    key: 'body',      width: 50 },
-        { header: 'Severity',   key: 'severity',  width: 12 },
-        { header: 'Channel',    key: 'channel',   width: 30 },
-        { header: 'Status',     key: 'status',    width: 15 },
-        { header: 'Source',     key: 'source',    width: 12 },
+        { header: 'Timestamp',       key: 'ts',          width: 22 },
+        { header: 'Title',           key: 'title',        width: 36 },
+        { header: 'Message',         key: 'body',         width: 50 },
+        { header: 'Severity',        key: 'severity',     width: 12 },
+        { header: 'Channel',         key: 'channel',      width: 30 },
+        { header: 'Status',          key: 'status',       width: 15 },
+        { header: 'Acknowledged By', key: 'ackedBy',      width: 28 },
+        { header: 'Acknowledged At', key: 'ackedAt',      width: 22 },
+        { header: 'Source',          key: 'source',       width: 12 },
       ];
 
       const hRow = history.getRow(1);
@@ -181,6 +183,8 @@ export default function AlertExportModal({ alerts, onClose }: Props) {
           severity: a.severity,
           channel:  a.channelName,
           status:   a.isRead ? 'Acknowledged' : 'Unread',
+          ackedBy:  a.acknowledgedBy ?? '',
+          ackedAt:  a.acknowledgedAt ? new Date(a.acknowledgedAt).toLocaleString() : '',
           source:   a.source,
         });
 
@@ -394,7 +398,7 @@ export default function AlertExportModal({ alerts, onClose }: Props) {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-800">
                   <tr>
-                    {['Timestamp', 'Title', 'Severity', 'Channel', 'Status'].map(h => (
+                    {['Timestamp', 'Title', 'Severity', 'Channel', 'Status', 'Acknowledged By'].map(h => (
                       <th key={h} className="text-left py-2 px-3 text-xs font-semibold text-gray-500 dark:text-gray-400">{h}</th>
                     ))}
                   </tr>
@@ -415,6 +419,11 @@ export default function AlertExportModal({ alerts, onClose }: Props) {
                         <span className={`text-xs font-medium ${a.isRead ? 'text-green-600' : 'text-orange-500'}`}>
                           {a.isRead ? 'Acknowledged' : 'Unread'}
                         </span>
+                      </td>
+                      <td className="py-2 px-3 text-gray-500 dark:text-gray-400 text-xs">
+                        {a.acknowledgedBy
+                          ? <span className="font-medium text-gray-700 dark:text-gray-300">{a.acknowledgedBy.split('@')[0]}</span>
+                          : <span className="opacity-40">—</span>}
                       </td>
                     </tr>
                   ))}
