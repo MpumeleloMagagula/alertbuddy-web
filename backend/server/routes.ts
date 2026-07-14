@@ -347,7 +347,10 @@ router.post('/users/invite', async (req: Request, res: Response) => {
       createdAt: Date.now(),
     }, { merge: true });
 
-    // Send invite email via Firebase Auth REST API (triggers Firebase's built-in email)
+    // Generate a set-password link (always returned so the portal can copy it)
+    const inviteLink = await admin.auth().generatePasswordResetLink(email);
+
+    // Also send email via Firebase Auth REST API so the invitee gets it automatically
     const apiKey = process.env.VITE_FIREBASE_API_KEY;
     let emailSent = false;
     if (apiKey) {
@@ -368,7 +371,7 @@ router.post('/users/invite', async (req: Request, res: Response) => {
     }
 
     console.log(`✉️  User invited: ${email}, email sent: ${emailSent}`);
-    res.json({ success: true, uid, emailSent });
+    res.json({ success: true, uid, inviteLink, emailSent });
   } catch (err: any) {
     console.error('Failed to invite user:', err);
     res.status(500).json({ success: false, error: err.message ?? 'Failed to create user' });

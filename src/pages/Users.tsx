@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users as UsersIcon, Plus, Edit, Trash2, Shield, Search, Mail, Check, X } from 'lucide-react';
+import { Users as UsersIcon, Plus, Edit, Trash2, Shield, Search, Mail, Check, Copy, X } from 'lucide-react';
 import { toast } from 'sonner';
 import firebase from '../services/firebase';
 import api from '../services/api';
@@ -33,7 +33,8 @@ export default function Users() {
   // Invite form state
   const [inviteForm, setInviteForm] = useState({ email: '', displayName: '', role: UserRole.USER });
   const [isInviting, setIsInviting] = useState(false);
-  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{ inviteLink: string; emailSent: boolean } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Edit form state
   const [editForm, setEditForm] = useState({ role: UserRole.USER, isActive: true });
@@ -75,13 +76,15 @@ export default function Users() {
 
   const openInviteModal = () => {
     setInviteForm({ email: '', displayName: '', role: UserRole.USER });
-    setInviteSuccess(false);
+    setInviteResult(null);
+    setLinkCopied(false);
     setShowAddModal(true);
   };
 
   const closeInviteModal = () => {
     setShowAddModal(false);
-    setInviteSuccess(false);
+    setInviteResult(null);
+    setLinkCopied(false);
   };
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -94,13 +97,20 @@ export default function Users() {
       setIsInviting(true);
       const result = await api.inviteUser(inviteForm);
       if (!result.success) throw new Error(result.error ?? 'Invite failed');
-      setInviteSuccess(true);
-      toast.success(`Invite sent to ${inviteForm.email}`);
+      setInviteResult({ inviteLink: result.inviteLink ?? '', emailSent: result.emailSent ?? false });
+      toast.success(`Account created for ${inviteForm.email}`);
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to invite user');
     } finally {
       setIsInviting(false);
     }
+  };
+
+  const copyInviteLink = async () => {
+    if (!inviteResult?.inviteLink) return;
+    await navigator.clipboard.writeText(inviteResult.inviteLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2500);
   };
 
   const openEditModal = (user: User) => {
@@ -358,25 +368,61 @@ export default function Users() {
               </button>
             </div>
 
-            {inviteSuccess ? (
-              /* Success state */
+            {inviteResult ? (
+              /* Success state — always show copy link + email status */
               <div className="p-6 space-y-4">
-                <div className="flex flex-col items-center text-center gap-3 py-4">
-                  <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                    <Check className="w-7 h-7 text-green-600 dark:text-green-400" />
-                  </div>
+                {/* Email status banner */}
+                <div className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${
+                  inviteResult.emailSent
+                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
+                    : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300'
+                }`}>
+                  <Mail className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">Invite sent!</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      An email has been sent to <strong className="text-gray-700 dark:text-gray-300">{inviteForm.email}</strong> with a link to set their password and log in.
-                    </p>
+                    {inviteResult.emailSent
+                      ? <><strong>Email sent</strong> — {inviteForm.email} will receive a link to set their password.</>
+                      : <><strong>Email could not be sent</strong> — copy the link below and share it with {inviteForm.displayName} manually.</>
+                    }
                   </div>
                 </div>
-                <div className="flex gap-3">
+
+                {/* Always-visible copy link */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                    Set-password link <span className="font-normal normal-case">(expires in 24 h)</span>
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      value={inviteResult.inviteLink}
+                      aria-label="Invite link"
+                      className="input text-xs flex-1 font-mono"
+                      onFocus={e => e.target.select()}
+                    />
+                    <button
+                      type="button"
+                      onClick={copyInviteLink}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all flex-shrink-0 ${
+                        linkCopied
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'btn-primary'
+                      }`}
+                    >
+                      {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      {linkCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-1">
                   <button type="button" onClick={closeInviteModal} className="btn-secondary flex-1">
                     Done
                   </button>
-                  <button type="button" onClick={() => { setInviteSuccess(false); setInviteForm({ email: '', displayName: '', role: UserRole.USER }); }} className="btn-primary flex-1">
+                  <button
+                    type="button"
+                    onClick={() => { setInviteResult(null); setLinkCopied(false); setInviteForm({ email: '', displayName: '', role: UserRole.USER }); }}
+                    className="btn-primary flex-1"
+                  >
                     Invite Another
                   </button>
                 </div>
