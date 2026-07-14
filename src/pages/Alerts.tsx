@@ -28,12 +28,16 @@ export default function Alerts() {
   const [filteredAlerts, setFilteredAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  
+  const [standbyInfo, setStandbyInfo] = useState<{ onStandby: boolean; displayName?: string; email?: string; tokenResolved?: boolean } | null>(null);
+
+  // Validation state
+  const [fieldErrors, setFieldErrors] = useState({ title: false, message: false });
+
   // Filter and search state
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  
+
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showExport, setShowExport] = useState(false);
@@ -60,20 +64,17 @@ export default function Alerts() {
   ];
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setIsLoading(false);
-    }, 5000);
+    const timeout = setTimeout(() => setIsLoading(false), 5000);
 
-    const unsubscribe = firebase.onAlertsChange((updatedAlerts: Alert[]) => {
+    const unsubAlerts = firebase.onAlertsChange((updatedAlerts: Alert[]) => {
       setAlerts(updatedAlerts);
       setIsLoading(false);
       clearTimeout(timeout);
     }, 100);
 
-    return () => {
-      unsubscribe();
-      clearTimeout(timeout);
-    };
+    const unsubStandby = firebase.onStandbyChange((info) => setStandbyInfo(info));
+
+    return () => { unsubAlerts(); unsubStandby(); clearTimeout(timeout); };
   }, []);
 
   useEffect(() => {
@@ -179,49 +180,56 @@ export default function Alerts() {
     }
   };
 
-  const handleSendToAll = async () => {
-    if (!testAlert.title || !testAlert.message) {
-      toast.error('Please fill in title and message');
-      return;
+  const validateForm = () => {
+    const errors = { title: !testAlert.title.trim(), message: !testAlert.message.trim() };
+    setFieldErrors(errors);
+    if (errors.title || errors.message) {
+      toast.error(`Please fill in ${[errors.title && 'title', errors.message && 'message'].filter(Boolean).join(' and ')}`);
+      return false;
     }
+    return true;
+  };
 
+  const resetForm = () => {
+    setTestAlert({ title: '', message: '', severity: 'WARNING' as Severity, channelId: 'core-monitoring', channelName: 'Core Services Monitoring' });
+    setFieldErrors({ title: false, message: false });
+  };
+
+  const handleSendToAll = async () => {
+    if (!validateForm()) return;
     try {
       setIsSending(true);
-      await api.sendTestAlert(testAlert);
+      const result = await api.sendTestAlert(testAlert);
+      if (result.success === false) throw new Error((result as any).error ?? 'No registered devices');
       toast.success('Alert sent to all devices');
-      setTestAlert({
-        title: '',
-        message: '',
-        severity: 'WARNING' as Severity,
-        channelId: 'test-channel',
-        channelName: 'Test Channel',
-      });
-    } catch (error) {
-      toast.error('Failed to send alert');
+      resetForm();
+    } catch (error: any) {
+      toast.error(error.message ?? 'Failed to send alert');
     } finally {
       setIsSending(false);
     }
   };
 
   const handleSendToStandby = async () => {
-    if (!testAlert.title || !testAlert.message) {
-      toast.error('Please fill in title and message');
+    if (!validateForm()) return;
+
+    if (!standbyInfo?.onStandby) {
+      toast.error('Nobody is on standby right now. Assign someone on the Standby page first.');
+      return;
+    }
+    if (!standbyInfo.tokenResolved) {
+      toast.error(`${standbyInfo.displayName ?? 'Standby person'} hasn't opened the app yet — their device token is pending.`);
       return;
     }
 
     try {
       setIsSending(true);
-      await api.sendStandbyAlert(testAlert);
-      toast.success('Alert sent to standby person');
-      setTestAlert({
-        title: '',
-        message: '',
-        severity: 'WARNING' as Severity,
-        channelId: 'test-channel',
-        channelName: 'Test Channel',
-      });
-    } catch (error) {
-      toast.error('Failed to send alert to standby');
+      const result = await api.sendStandbyAlert(testAlert);
+      if (result.success === false) throw new Error((result as any).error ?? 'Failed to send');
+      toast.success(`Alert sent to ${standbyInfo.displayName ?? 'standby person'}`);
+      resetForm();
+    } catch (error: any) {
+      toast.error(error.message ?? 'Failed to send alert to standby');
     } finally {
       setIsSending(false);
     }
@@ -308,26 +316,32 @@ export default function Alerts() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Title <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={testAlert.title}
-                  onChange={(e) => setTestAlert({ ...testAlert, title: e.target.value })}
-                  className="input"
+                  onChange={(e) => { setTestAlert({ ...testAlert, title: e.target.value }); setFieldErrors(f => ({ ...f, title: false })); }}
+                  className={`input ${fieldErrors.title ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="e.g., CPU Usage Critical"
                   disabled={isSending}
                 />
+                {fieldErrors.title && <p className="text-xs text-red-500 mt-1">Title is required</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Message</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Message <span className="text-red-500">*</span>
+                </label>
                 <textarea
                   value={testAlert.message}
-                  onChange={(e) => setTestAlert({ ...testAlert, message: e.target.value })}
-                  className="input min-h-[80px] resize-none"
+                  onChange={(e) => { setTestAlert({ ...testAlert, message: e.target.value }); setFieldErrors(f => ({ ...f, message: false })); }}
+                  className={`input min-h-[80px] resize-none ${fieldErrors.message ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="Alert details..."
                   disabled={isSending}
                 />
+                {fieldErrors.message && <p className="text-xs text-red-500 mt-1">Message is required</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -364,14 +378,41 @@ export default function Alerts() {
 
               <div className="flex flex-col gap-2 pt-2">
                 <button type="button" onClick={handleSendToAll} disabled={isSending} className="btn-primary w-full flex items-center justify-center gap-2">
-                  <Send className="w-4 h-4" /> Send to All
+                  <Send className="w-4 h-4" />
+                  {isSending ? 'Sending...' : 'Send to All'}
                 </button>
-                <button type="button" onClick={handleSendToStandby} disabled={isSending} className="btn-secondary w-full flex items-center justify-center gap-2">
-                  <UserCheck className="w-4 h-4" /> Send to Standby
+                <button
+                  type="button"
+                  onClick={handleSendToStandby}
+                  disabled={isSending || !standbyInfo?.onStandby}
+                  title={!standbyInfo?.onStandby ? 'No one is on standby — assign someone first' : undefined}
+                  className="btn-secondary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  {isSending ? 'Sending...' : 'Send to Standby'}
                 </button>
                 <button type="button" onClick={handleTestGrafanaWebhook} disabled={isSending} className="btn-secondary w-full flex items-center justify-center gap-2">
                   <TestTube className="w-4 h-4" /> Test Webhook
                 </button>
+              </div>
+
+              {/* Standby status pill */}
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
+                standbyInfo?.onStandby
+                  ? standbyInfo.tokenResolved
+                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                    : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+              }`}>
+                <UserCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                {standbyInfo === null
+                  ? 'Loading standby...'
+                  : standbyInfo.onStandby
+                    ? standbyInfo.tokenResolved
+                      ? `On standby: ${standbyInfo.displayName}`
+                      : `On standby: ${standbyInfo.displayName} (app not connected yet)`
+                    : 'No one on standby — Send to Standby is disabled'
+                }
               </div>
             </div>
           </div>
