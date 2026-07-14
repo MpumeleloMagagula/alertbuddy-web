@@ -347,11 +347,17 @@ router.post('/users/invite', async (req: Request, res: Response) => {
       createdAt: Date.now(),
     }, { merge: true });
 
-    // After setting their password, the user lands on the portal login page
+    // After setting their password, the user is redirected to the portal login page.
+    // continueUrl must be an authorized domain in Firebase Console → Auth → Settings.
     const continueUrl = 'https://alertbuddy-web.vercel.app/login';
 
-    // Generate a set-password link (always returned so the portal can copy it as a fallback)
-    const inviteLink = await admin.auth().generatePasswordResetLink(email, { url: continueUrl });
+    // Generate a set-password link — fall back without continueUrl if domain not yet whitelisted
+    let inviteLink: string;
+    try {
+      inviteLink = await admin.auth().generatePasswordResetLink(email, { url: continueUrl });
+    } catch {
+      inviteLink = await admin.auth().generatePasswordResetLink(email);
+    }
 
     // Also send email via Firebase Auth REST API so the invitee gets it automatically
     const apiKey = process.env.VITE_FIREBASE_API_KEY;
