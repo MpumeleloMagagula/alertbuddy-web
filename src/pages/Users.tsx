@@ -456,9 +456,9 @@ export default function Users() {
                     onChange={e => setInviteForm(f => ({ ...f, role: e.target.value as UserRole }))}
                     className="input w-full"
                   >
-                    <option value={UserRole.USER}>User — receives alerts, standby rotation</option>
-                    <option value={UserRole.MANAGER}>Manager — view all alerts, manage shifts</option>
-                    <option value={UserRole.ADMIN}>Admin — full system access</option>
+                    <option value={UserRole.USER}>User: Receives alerts, standby rotation</option>
+                    <option value={UserRole.MANAGER}>Manager: view all alerts, manage shifts</option>
+                    <option value={UserRole.ADMIN}>Admin: full system access</option>
                   </select>
                 </div>
 

@@ -106,7 +106,7 @@ export default function Standby() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Standby Management</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">Manage who is on call — updates in real time</p>
+        <p className="text-gray-600 dark:text-gray-400 mt-2">Manage who is on call, updates in real time</p>
       </div>
 
       {/* Current standby */}
@@ -187,7 +187,7 @@ export default function Standby() {
 
         {registeredUsers.length === 0 ? (
           <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-800 dark:text-yellow-300">
-            No registered devices yet. Team members need to install the Alert Buddy app and sign in — they'll appear here automatically.
+            No registered devices yet. Team members need to install the Alert Buddy app and sign in, they'll appear here automatically.
           </div>
         ) : (
           <div className="space-y-3">
@@ -280,7 +280,7 @@ export default function Standby() {
           <div>
             <p className="font-semibold mb-1 text-primary-950 dark:text-primary-200">How standby works</p>
             <ul className="space-y-1 list-disc list-inside text-primary-800 dark:text-primary-400">
-              <li>Only the standby person receives alerts — everyone else's phone stays quiet</li>
+              <li>Only the standby person receives alerts, everyone else's phone stays quiet</li>
               <li>If nobody is on standby, alerts broadcast to all registered devices</li>
               <li>Team members appear here automatically once they sign into the app</li>
               <li>Every handover is logged for accountability</li>
