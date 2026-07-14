@@ -20,7 +20,7 @@ import {
 import { toast } from 'sonner';
 import api from '../services/api';
 import firebase from '../services/firebase';
-import type { Alert, TestAlertFormData, Severity } from '../types';
+import type { Alert, TestAlertFormData, Severity, StandbyInfo } from '../types';
 import AlertExportModal from '../components/AlertExportModal';
 
 export default function Alerts() {
@@ -28,7 +28,7 @@ export default function Alerts() {
   const [filteredAlerts, setFilteredAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [standbyInfo, setStandbyInfo] = useState<{ onStandby: boolean; displayName?: string; email?: string; tokenResolved?: boolean } | null>(null);
+  const [standbyInfo, setStandbyInfo] = useState<StandbyInfo | null>(null);
 
   // Validation state
   const [fieldErrors, setFieldErrors] = useState({ title: false, message: false });
@@ -72,6 +72,12 @@ export default function Alerts() {
       clearTimeout(timeout);
     }, 100);
 
+    // Immediate API fetch — doesn't depend on Firestore real-time listener
+    api.getCurrentStandby().then(setStandbyInfo).catch(() => {
+      setStandbyInfo({ onStandby: false, tokenResolved: false, updatedAt: 0 });
+    });
+
+    // Firestore listener keeps it up to date after the initial load
     const unsubStandby = firebase.onStandbyChange((info) => setStandbyInfo(info));
 
     return () => { unsubAlerts(); unsubStandby(); clearTimeout(timeout); };

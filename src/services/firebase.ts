@@ -179,6 +179,8 @@ class FirebaseService {
       callback(snap.exists() ? snap.data() : { onStandby: false, tokenResolved: false });
     }, (error) => {
       console.error('Error listening to standby:', error);
+      // Call callback with empty state so callers don't get stuck waiting
+      callback({ onStandby: false, tokenResolved: false });
     });
   }
 

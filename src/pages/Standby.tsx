@@ -74,15 +74,17 @@ export default function Standby() {
 
     try {
       setIsAssigning(true);
-      await api.updateStandby(user.email, user.displayName, firebase.getCurrentUser()?.email ?? '');
+      const result = await api.updateStandby(user.email, user.displayName, firebase.getCurrentUser()?.email ?? '');
       // Optimistic update so UI reflects assignment immediately, even if onSnapshot is slow
       setStandbyInfo({
         onStandby: true,
         email: user.email,
         displayName: user.displayName,
-        tokenResolved: false,
+        tokenResolved: (result as any)?.tokenResolved ?? false,
         updatedAt: Date.now(),
       });
+      // Re-fetch from backend after a short delay to confirm the Firestore write landed
+      setTimeout(() => { api.getCurrentStandby().then(s => setStandbyInfo(s)).catch(() => {}); }, 1500);
       toast.success(`${user.displayName} is now on standby`);
       setSelectedEmail('');
     } catch {
