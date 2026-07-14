@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users as UsersIcon, Plus, Edit, Trash2, Shield, Search } from 'lucide-react';
+import { Users as UsersIcon, Plus, Edit, Trash2, Shield, Search, Mail, Copy, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import firebase from '../services/firebase';
+import api from '../services/api';
 import { UserRole } from '../types';
 import type { User } from '../types';
 
@@ -28,6 +29,16 @@ export default function Users() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Invite form state
+  const [inviteForm, setInviteForm] = useState({ email: '', displayName: '', role: UserRole.USER });
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  // Edit form state
+  const [editForm, setEditForm] = useState({ role: UserRole.USER, isActive: true });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => setIsLoading(false), 5000);
@@ -63,6 +74,64 @@ export default function Users() {
     }
   };
 
+  const openInviteModal = () => {
+    setInviteForm({ email: '', displayName: '', role: UserRole.USER });
+    setInviteLink(null);
+    setLinkCopied(false);
+    setShowAddModal(true);
+  };
+
+  const closeInviteModal = () => {
+    setShowAddModal(false);
+    setInviteLink(null);
+  };
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteForm.email || !inviteForm.displayName) {
+      toast.error('Name and email are required');
+      return;
+    }
+    try {
+      setIsInviting(true);
+      const result = await api.inviteUser(inviteForm);
+      if (!result.success) throw new Error(result.error ?? 'Invite failed');
+      setInviteLink(result.inviteLink ?? null);
+      toast.success(`Invite sent to ${inviteForm.email}`);
+    } catch (err: any) {
+      toast.error(err.message ?? 'Failed to invite user');
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!inviteLink) return;
+    await navigator.clipboard.writeText(inviteLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  const openEditModal = (user: User) => {
+    setEditForm({ role: user.role, isActive: user.isActive });
+    setEditingUser(user);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    try {
+      setIsSavingEdit(true);
+      await firebase.updateUser(editingUser.id, editForm);
+      toast.success('User updated');
+      setEditingUser(null);
+    } catch {
+      toast.error('Failed to update user');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   const getRoleBadgeColor = (role: UserRole) => {
     switch (role) {
       case 'ADMIN':   return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800/50';
@@ -90,7 +159,7 @@ export default function Users() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Alert Users</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">Manage user accounts and permissions</p>
         </div>
-        <button type="button" onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2">
+        <button type="button" onClick={openInviteModal} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           Add User
         </button>
@@ -188,7 +257,7 @@ export default function Users() {
             {users.length === 0 ? (
               <>
                 <p>No users found</p>
-                <button type="button" onClick={() => setShowAddModal(true)} className="btn-primary mt-4">
+                <button type="button" onClick={openInviteModal} className="btn-primary mt-4">
                   Add Your First User
                 </button>
               </>
@@ -249,7 +318,7 @@ export default function Users() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() => setEditingUser(user)}
+                            onClick={() => openEditModal(user)}
                             className="text-primary-600 hover:text-primary-700 p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
                             title="Edit user"
                           >
@@ -289,23 +358,184 @@ export default function Users() {
         </div>
       </div>
 
-      {/* Add/Edit User Modal */}
-      {(showAddModal || editingUser) && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-              {editingUser ? 'Edit User' : 'Add New User'}
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              User management forms will be implemented with Firebase Authentication integration.
-            </p>
-            <button
-              type="button"
-              onClick={() => { setShowAddModal(false); setEditingUser(null); }}
-              className="btn-secondary w-full"
-            >
-              Close
-            </button>
+      {/* Invite User Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Invite Team Member</h3>
+              <button type="button" onClick={closeInviteModal} aria-label="Close" className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+
+            {inviteLink ? (
+              /* Success state — show the invite link */
+              <div className="p-6 space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <Mail className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  <div className="text-sm text-green-800 dark:text-green-300">
+                    <p className="font-semibold">Account created!</p>
+                    <p>Share this link with <strong>{inviteForm.email}</strong> so they can set their password.</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
+                    Invite Link
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="invite-link-output"
+                      readOnly
+                      value={inviteLink}
+                      aria-label="Invite link"
+                      className="input text-xs flex-1 font-mono"
+                      onFocus={e => e.target.select()}
+                    />
+                    <button
+                      type="button"
+                      onClick={copyLink}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        linkCopied
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'btn-primary'
+                      }`}
+                    >
+                      {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      {linkCopied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    This link expires after 24 hours.
+                  </p>
+                </div>
+
+                <button type="button" onClick={closeInviteModal} className="btn-secondary w-full">
+                  Done
+                </button>
+              </div>
+            ) : (
+              /* Invite form */
+              <form onSubmit={handleInvite} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={inviteForm.displayName}
+                    onChange={e => setInviteForm(f => ({ ...f, displayName: e.target.value }))}
+                    placeholder="e.g. John Smith"
+                    className="input w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={inviteForm.email}
+                    onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="john@example.com"
+                    className="input w-full"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="invite-role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Role
+                  </label>
+                  <select
+                    id="invite-role"
+                    value={inviteForm.role}
+                    onChange={e => setInviteForm(f => ({ ...f, role: e.target.value as UserRole }))}
+                    className="input w-full"
+                  >
+                    <option value={UserRole.USER}>User — receives alerts, standby rotation</option>
+                    <option value={UserRole.MANAGER}>Manager — view all alerts, manage shifts</option>
+                    <option value={UserRole.ADMIN}>Admin — full system access</option>
+                  </select>
+                </div>
+
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  An account will be created and you'll receive a link to share with the invitee so they can set their password.
+                </p>
+
+                <div className="flex gap-3 pt-1">
+                  <button type="button" onClick={closeInviteModal} className="btn-secondary flex-1">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={isInviting} className="btn-primary flex-1 disabled:opacity-50">
+                    {isInviting ? 'Creating account…' : 'Send Invite'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-sm w-full shadow-xl">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Edit User</h3>
+              <button type="button" onClick={() => setEditingUser(null)} aria-label="Close" className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{editingUser.displayName}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{editingUser.email}</p>
+              </div>
+
+              <div>
+                <label htmlFor="edit-role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Role</label>
+                <select
+                  id="edit-role"
+                  value={editForm.role}
+                  onChange={e => setEditForm(f => ({ ...f, role: e.target.value as UserRole }))}
+                  className="input w-full"
+                >
+                  <option value={UserRole.USER}>User</option>
+                  <option value={UserRole.MANAGER}>Manager</option>
+                  <option value={UserRole.ADMIN}>Admin</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</span>
+                <button
+                  type="button"
+                  aria-label={editForm.isActive ? 'Deactivate user' : 'Activate user'}
+                  onClick={() => setEditForm(f => ({ ...f, isActive: !f.isActive }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    editForm.isActive ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    editForm.isActive ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setEditingUser(null)} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isSavingEdit} className="btn-primary flex-1 disabled:opacity-50">
+                  {isSavingEdit ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

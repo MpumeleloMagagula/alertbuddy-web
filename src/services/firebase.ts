@@ -172,6 +172,16 @@ class FirebaseService {
     });
   }
 
+  // ========== Standby (Firestore real-time) ==========
+  onStandbyChange(callback: (standby: any) => void): () => void {
+    const ref = doc(db, 'standby', 'current');
+    return onSnapshot(ref, (snap) => {
+      callback(snap.exists() ? snap.data() : { onStandby: false, tokenResolved: false });
+    }, (error) => {
+      console.error('Error listening to standby:', error);
+    });
+  }
+
   // ========== Devices (Firestore) ==========
   onDevicesChange(callback: (devices: any[]) => void): () => void {
     const devicesRef = collection(db, 'devices');

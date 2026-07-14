@@ -113,6 +113,11 @@ class ApiService {
     return data;
   }
 
+  async inviteUser(userData: { email: string; displayName: string; role: string }): Promise<{ success: boolean; inviteLink?: string; error?: string }> {
+    const { data } = await this.api.post('/api/users/invite', userData);
+    return data;
+  }
+
   async createUser(userData: Partial<User>): Promise<ApiResponse<User>> {
     const { data } = await this.api.post<ApiResponse<User>>('/api/users', userData);
     return data;

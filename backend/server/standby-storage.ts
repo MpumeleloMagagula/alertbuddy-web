@@ -1,9 +1,4 @@
-import { getTokenByEmail } from './device-storage.js';
-
-/**
- * In-memory standby state storage
- * In production, this should be replaced with a database
- */
+import admin from 'firebase-admin';
 
 export interface StandbyInfo {
   onStandby: boolean;
@@ -25,126 +20,120 @@ export interface HandoverLog {
   pendingAlertsCount: number;
 }
 
-let currentStandby: StandbyInfo = {
-  onStandby: false,
-  tokenResolved: false,
-  updatedAt: Date.now(),
-};
+// Warm in-memory cache so subsequent requests on the same instance skip Firestore reads
+let memCache: StandbyInfo = { onStandby: false, tokenResolved: false, updatedAt: Date.now() };
 
-const handoverHistory: HandoverLog[] = [];
+function ready(): boolean { return admin.apps.length > 0; }
 
-/**
- * Update who is on standby
- */
-export function updateStandby(
+async function resolveTokenForEmail(email: string): Promise<string | null> {
+  if (!ready()) return null;
+  try {
+    const snap = await admin.firestore()
+      .collection('devices')
+      .where('email', '==', email)
+      .orderBy('lastSeen', 'desc')
+      .limit(1)
+      .get();
+    return snap.empty ? null : ((snap.docs[0].data().fcmToken as string) ?? null);
+  } catch {
+    return null;
+  }
+}
+
+export async function getCurrentStandby(): Promise<StandbyInfo> {
+  if (!ready()) return memCache;
+  try {
+    const snap = await admin.firestore().doc('standby/current').get();
+    if (!snap.exists) return memCache;
+    const data = snap.data() as StandbyInfo;
+    memCache = data;
+    return data;
+  } catch {
+    return memCache;
+  }
+}
+
+// Synchronous read of warm cache — safe to call in places that can't await
+export function getCurrentStandbySync(): StandbyInfo {
+  return memCache;
+}
+
+export async function updateStandby(
   email: string,
   displayName: string,
-  _updatedByEmail?: string
-): StandbyInfo {
-  const token = getTokenByEmail(email);
-  
-  // Log handover if someone was already on standby
-  if (currentStandby.onStandby && currentStandby.email !== email) {
-    logHandover(
-      currentStandby.email!,
-      currentStandby.displayName!,
-      email,
-      displayName,
-      'Manual handover via API'
-    );
+  _updatedByEmail?: string,
+): Promise<StandbyInfo> {
+  const prev = await getCurrentStandby();
+
+  // Log handover when the person changes
+  if (prev.onStandby && prev.email && prev.email !== email) {
+    void logHandover(prev.email, prev.displayName ?? prev.email, email, displayName);
   }
 
-  currentStandby = {
+  const fcmToken = await resolveTokenForEmail(email);
+  const next: StandbyInfo = {
     onStandby: true,
     email,
     displayName,
-    fcmToken: token,
-    tokenResolved: !!token,
+    fcmToken: fcmToken ?? undefined,
+    tokenResolved: !!fcmToken,
     updatedAt: Date.now(),
   };
 
-  console.log(`✅ Standby updated: ${displayName} (${email})`);
-  console.log(`   Token resolved: ${currentStandby.tokenResolved}`);
-
-  return currentStandby;
-}
-
-/**
- * Get current standby info
- */
-export function getCurrentStandby(): StandbyInfo {
-  // Try to resolve token if it wasn't resolved before
-  if (currentStandby.onStandby && !currentStandby.tokenResolved && currentStandby.email) {
-    const token = getTokenByEmail(currentStandby.email);
-    if (token) {
-      currentStandby.fcmToken = token;
-      currentStandby.tokenResolved = true;
-      console.log(`✅ Token resolved for ${currentStandby.email}`);
+  memCache = next;
+  if (ready()) {
+    try { await admin.firestore().doc('standby/current').set(next); } catch (err) {
+      console.error('Failed to persist standby:', err);
     }
   }
 
-  return currentStandby;
+  console.log(`✅ Standby → ${displayName} (${email}), token: ${next.tokenResolved}`);
+  return next;
 }
 
-/**
- * Clear standby (no one on call)
- */
-export function clearStandby(): StandbyInfo {
-  if (currentStandby.onStandby) {
-    console.log(`✅ Standby cleared: ${currentStandby.displayName}`);
+export async function clearStandby(): Promise<StandbyInfo> {
+  const cleared: StandbyInfo = { onStandby: false, tokenResolved: false, updatedAt: Date.now() };
+  memCache = cleared;
+  if (ready()) {
+    try { await admin.firestore().doc('standby/current').set(cleared); } catch {}
   }
-
-  currentStandby = {
-    onStandby: false,
-    tokenResolved: false,
-    updatedAt: Date.now(),
-  };
-
-  return currentStandby;
+  return cleared;
 }
 
-/**
- * Log a handover event
- */
-function logHandover(
-  fromEmail: string,
-  fromName: string,
-  toEmail: string,
-  toName: string,
-  notes?: string
-): void {
-  const log: HandoverLog = {
-    id: `handover-${Date.now()}`,
-    fromUserId: fromEmail,
-    fromUserName: fromName,
-    toUserId: toEmail,
-    toUserName: toName,
-    handoverAt: Date.now(),
-    notes,
-    pendingAlertsCount: 0, // Could be calculated from alert storage
-  };
-
-  handoverHistory.unshift(log);
-
-  // Keep only last 100 handovers
-  if (handoverHistory.length > 100) {
-    handoverHistory.pop();
+async function logHandover(
+  fromEmail: string, fromName: string,
+  toEmail: string, toName: string,
+  notes = 'Manual handover',
+): Promise<void> {
+  if (!ready()) return;
+  try {
+    const log: HandoverLog = {
+      id: `handover-${Date.now()}`,
+      fromUserId: fromEmail,
+      fromUserName: fromName,
+      toUserId: toEmail,
+      toUserName: toName,
+      handoverAt: Date.now(),
+      notes,
+      pendingAlertsCount: 0,
+    };
+    await admin.firestore().collection('handover_logs').doc(log.id).set(log);
+    console.log(`📝 Handover logged: ${fromName} → ${toName}`);
+  } catch (err) {
+    console.error('Failed to log handover:', err);
   }
-
-  console.log(`📝 Handover logged: ${fromName} → ${toName}`);
 }
 
-/**
- * Get handover history
- */
-export function getHandoverHistory(limit: number = 20): HandoverLog[] {
-  return handoverHistory.slice(0, limit);
-}
-
-/**
- * Clear handover history (for testing)
- */
-export function clearHandoverHistory(): void {
-  handoverHistory.length = 0;
-  console.log('🗑️  Handover history cleared');
+export async function getHandoverHistory(limitCount = 20): Promise<HandoverLog[]> {
+  if (!ready()) return [];
+  try {
+    const snap = await admin.firestore()
+      .collection('handover_logs')
+      .orderBy('handoverAt', 'desc')
+      .limit(limitCount)
+      .get();
+    return snap.docs.map(d => d.data() as HandoverLog);
+  } catch {
+    return [];
+  }
 }
