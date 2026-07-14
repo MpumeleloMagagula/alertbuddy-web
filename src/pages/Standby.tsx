@@ -75,6 +75,14 @@ export default function Standby() {
     try {
       setIsAssigning(true);
       await api.updateStandby(user.email, user.displayName, firebase.getCurrentUser()?.email ?? '');
+      // Optimistic update so UI reflects assignment immediately, even if onSnapshot is slow
+      setStandbyInfo({
+        onStandby: true,
+        email: user.email,
+        displayName: user.displayName,
+        tokenResolved: false,
+        updatedAt: Date.now(),
+      });
       toast.success(`${user.displayName} is now on standby`);
       setSelectedEmail('');
     } catch {
@@ -89,6 +97,8 @@ export default function Standby() {
     try {
       setIsClearing(true);
       await api.clearStandby();
+      // Optimistic update
+      setStandbyInfo({ onStandby: false, tokenResolved: false, updatedAt: Date.now() });
       toast.success('Standby cleared');
     } catch {
       toast.error('Failed to clear standby');

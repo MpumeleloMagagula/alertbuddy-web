@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users as UsersIcon, Plus, Edit, Trash2, Shield, Search, Mail, Copy, Check, X } from 'lucide-react';
+import { Users as UsersIcon, Plus, Edit, Trash2, Shield, Search, Mail, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import firebase from '../services/firebase';
 import api from '../services/api';
@@ -33,8 +33,7 @@ export default function Users() {
   // Invite form state
   const [inviteForm, setInviteForm] = useState({ email: '', displayName: '', role: UserRole.USER });
   const [isInviting, setIsInviting] = useState(false);
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState(false);
 
   // Edit form state
   const [editForm, setEditForm] = useState({ role: UserRole.USER, isActive: true });
@@ -76,14 +75,13 @@ export default function Users() {
 
   const openInviteModal = () => {
     setInviteForm({ email: '', displayName: '', role: UserRole.USER });
-    setInviteLink(null);
-    setLinkCopied(false);
+    setInviteSuccess(false);
     setShowAddModal(true);
   };
 
   const closeInviteModal = () => {
     setShowAddModal(false);
-    setInviteLink(null);
+    setInviteSuccess(false);
   };
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -96,20 +94,13 @@ export default function Users() {
       setIsInviting(true);
       const result = await api.inviteUser(inviteForm);
       if (!result.success) throw new Error(result.error ?? 'Invite failed');
-      setInviteLink(result.inviteLink ?? null);
+      setInviteSuccess(true);
       toast.success(`Invite sent to ${inviteForm.email}`);
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to invite user');
     } finally {
       setIsInviting(false);
     }
-  };
-
-  const copyLink = async () => {
-    if (!inviteLink) return;
-    await navigator.clipboard.writeText(inviteLink);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   const openEditModal = (user: User) => {
@@ -215,7 +206,6 @@ export default function Users() {
 
       {/* Filter bar */}
       <div className="card flex flex-col sm:flex-row sm:items-center gap-4">
-        {/* Role pills */}
         <div className="flex items-center gap-2 flex-wrap">
           {ROLE_FILTERS.map(role => (
             <button
@@ -236,12 +226,11 @@ export default function Users() {
           ))}
         </div>
 
-        {/* Search */}
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name, email or department…"
+            placeholder="Search by name, email or department..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="input pl-9 w-full"
@@ -369,51 +358,28 @@ export default function Users() {
               </button>
             </div>
 
-            {inviteLink ? (
-              /* Success state — show the invite link */
+            {inviteSuccess ? (
+              /* Success state */
               <div className="p-6 space-y-4">
-                <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <Mail className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-                  <div className="text-sm text-green-800 dark:text-green-300">
-                    <p className="font-semibold">Account created!</p>
-                    <p>Share this link with <strong>{inviteForm.email}</strong> so they can set their password.</p>
+                <div className="flex flex-col items-center text-center gap-3 py-4">
+                  <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                    <Check className="w-7 h-7 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">Invite sent!</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      An email has been sent to <strong className="text-gray-700 dark:text-gray-300">{inviteForm.email}</strong> with a link to set their password and log in.
+                    </p>
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5 uppercase tracking-wide">
-                    Invite Link
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      id="invite-link-output"
-                      readOnly
-                      value={inviteLink}
-                      aria-label="Invite link"
-                      className="input text-xs flex-1 font-mono"
-                      onFocus={e => e.target.select()}
-                    />
-                    <button
-                      type="button"
-                      onClick={copyLink}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        linkCopied
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'btn-primary'
-                      }`}
-                    >
-                      {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      {linkCopied ? 'Copied' : 'Copy'}
-                    </button>
-                  </div>
-                  <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    This link expires after 24 hours.
-                  </p>
+                <div className="flex gap-3">
+                  <button type="button" onClick={closeInviteModal} className="btn-secondary flex-1">
+                    Done
+                  </button>
+                  <button type="button" onClick={() => { setInviteSuccess(false); setInviteForm({ email: '', displayName: '', role: UserRole.USER }); }} className="btn-primary flex-1">
+                    Invite Another
+                  </button>
                 </div>
-
-                <button type="button" onClick={closeInviteModal} className="btn-secondary w-full">
-                  Done
-                </button>
               </div>
             ) : (
               /* Invite form */
@@ -456,22 +422,23 @@ export default function Users() {
                     onChange={e => setInviteForm(f => ({ ...f, role: e.target.value as UserRole }))}
                     className="input w-full"
                   >
-                    <option value={UserRole.USER}>User: Receives alerts, standby rotation</option>
+                    <option value={UserRole.USER}>User: receives alerts, standby rotation</option>
                     <option value={UserRole.MANAGER}>Manager: view all alerts, manage shifts</option>
                     <option value={UserRole.ADMIN}>Admin: full system access</option>
                   </select>
                 </div>
 
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  An account will be created and you'll receive a link to share with the invitee so they can set their password.
-                </p>
+                <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-blue-700 dark:text-blue-300">
+                  <Mail className="w-4 h-4 flex-shrink-0" />
+                  <span>Firebase will send a "set your password" email directly to the invitee.</span>
+                </div>
 
                 <div className="flex gap-3 pt-1">
                   <button type="button" onClick={closeInviteModal} className="btn-secondary flex-1">
                     Cancel
                   </button>
                   <button type="submit" disabled={isInviting} className="btn-primary flex-1 disabled:opacity-50">
-                    {isInviting ? 'Creating account…' : 'Send Invite'}
+                    {isInviting ? 'Sending...' : 'Send Invite'}
                   </button>
                 </div>
               </form>
@@ -532,7 +499,7 @@ export default function Users() {
                   Cancel
                 </button>
                 <button type="submit" disabled={isSavingEdit} className="btn-primary flex-1 disabled:opacity-50">
-                  {isSavingEdit ? 'Saving…' : 'Save Changes'}
+                  {isSavingEdit ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>

@@ -338,9 +338,6 @@ router.post('/users/invite', async (req: Request, res: Response) => {
       uid = created.uid;
     }
 
-    // Generate a "set password" link (password reset works for new accounts too)
-    const inviteLink = await admin.auth().generatePasswordResetLink(email);
-
     // Save/update user record in Firestore
     await admin.firestore().collection('users').doc(uid).set({
       email,
@@ -350,8 +347,28 @@ router.post('/users/invite', async (req: Request, res: Response) => {
       createdAt: Date.now(),
     }, { merge: true });
 
-    console.log(`✉️  User invited: ${email}`);
-    res.json({ success: true, uid, inviteLink });
+    // Send invite email via Firebase Auth REST API (triggers Firebase's built-in email)
+    const apiKey = process.env.VITE_FIREBASE_API_KEY;
+    let emailSent = false;
+    if (apiKey) {
+      try {
+        const emailRes = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestType: 'PASSWORD_RESET', email }),
+          }
+        );
+        emailSent = emailRes.ok;
+        if (!emailRes.ok) console.error('Firebase email API:', await emailRes.text());
+      } catch (emailErr) {
+        console.error('Failed to send invite email:', emailErr);
+      }
+    }
+
+    console.log(`✉️  User invited: ${email}, email sent: ${emailSent}`);
+    res.json({ success: true, uid, emailSent });
   } catch (err: any) {
     console.error('Failed to invite user:', err);
     res.status(500).json({ success: false, error: err.message ?? 'Failed to create user' });
