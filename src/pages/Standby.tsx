@@ -28,17 +28,21 @@ export default function Standby() {
   const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {
-    // Real-time standby listener — no refresh button needed
+    // API calls on mount so the page has data immediately, even when
+    // Firestore client-side listeners are blocked (e.g. by an ad blocker)
+    api.getCurrentStandby().then(s => setStandbyInfo(s)).catch(() => {
+      setStandbyInfo({ onStandby: false, tokenResolved: false, updatedAt: 0 });
+    });
+    api.getDevices().then(devs => setDevices(devs)).catch(() => {});
+    api.getHandoverHistory(15).then(logs => setHandoverLogs(logs)).catch(() => {});
+
+    // Real-time Firestore listeners — will override the API data when they connect
     const unsubStandby = firebase.onStandbyChange((info) => {
       setStandbyInfo(info as StandbyInfo);
     });
-
-    // Real-time handover history
     const unsubLogs = firebase.onHandoverLogsChange((logs) => {
       setHandoverLogs(logs);
     }, 15);
-
-    // Real-time registered devices (our source for who can be put on standby)
     const unsubDevices = firebase.onDevicesChange((devs) => {
       setDevices(devs);
     });

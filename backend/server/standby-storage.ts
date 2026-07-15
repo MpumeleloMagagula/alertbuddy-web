@@ -28,13 +28,19 @@ function ready(): boolean { return admin.apps.length > 0; }
 async function resolveTokenForEmail(email: string): Promise<string | null> {
   if (!ready()) return null;
   try {
+    // No orderBy — avoids requiring a composite index in Firestore
     const snap = await admin.firestore()
       .collection('devices')
       .where('email', '==', email)
-      .orderBy('lastSeen', 'desc')
-      .limit(1)
+      .limit(5)
       .get();
-    return snap.empty ? null : ((snap.docs[0].data().fcmToken as string) ?? null);
+    if (snap.empty) return null;
+    // Pick the device with the most recent lastSeen in JS
+    let best = snap.docs[0];
+    for (const d of snap.docs) {
+      if ((d.data().lastSeen ?? 0) > (best.data().lastSeen ?? 0)) best = d;
+    }
+    return (best.data().fcmToken as string) ?? null;
   } catch {
     return null;
   }

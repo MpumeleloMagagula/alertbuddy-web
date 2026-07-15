@@ -118,8 +118,16 @@ router.post('/devices/unregister', async (req: Request, res: Response) => {
   res.json({ success, message: success ? 'Device unregistered' : 'Device not found' });
 });
 
-router.get('/devices', (_req: Request, res: Response) => {
-  res.json(deviceStorage.getAllDevices());
+router.get('/devices', async (_req: Request, res: Response) => {
+  let devices = deviceStorage.getAllDevices();
+  // In-memory store is empty on cold start — fall back to Firestore
+  if (devices.length === 0 && fcm.isFirebaseReady()) {
+    try {
+      const snap = await admin.firestore().collection('devices').get();
+      devices = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    } catch {}
+  }
+  res.json(devices);
 });
 
 // ── Standby Management ────────────────────────────────────────────────────────
