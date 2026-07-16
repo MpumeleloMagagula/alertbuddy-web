@@ -94,6 +94,26 @@ router.post('/devices/register', async (req: Request, res: Response) => {
     await standbyStorage.updateStandby(email, standby.displayName!);
   }
 
+  // Clean up stale registrations from the same physical device (app reinstall / upgrade)
+  if (fcm.isFirebaseReady() && deviceModel) {
+    try {
+      const devSnap = await admin.firestore().collection('devices').where('email', '==', email).get();
+      const stale = devSnap.docs.filter(d =>
+        d.id !== deviceId &&
+        d.data().deviceModel === deviceModel &&
+        d.data().deviceName === deviceName
+      );
+      if (stale.length > 0) {
+        const batch = admin.firestore().batch();
+        stale.forEach(d => { batch.delete(d.ref); deviceStorage.unregisterDevice(d.id); });
+        await batch.commit();
+        console.log(`🧹 Removed ${stale.length} stale registration(s) for ${email}`);
+      }
+    } catch (err) {
+      console.error('Stale device cleanup failed:', err);
+    }
+  }
+
   res.json({ success: true, device });
 });
 
@@ -137,13 +157,13 @@ router.get('/standby/current', async (_req: Request, res: Response) => {
 });
 
 router.post('/standby/update', async (req: Request, res: Response) => {
-  const { email, displayName, updatedByEmail } = req.body;
+  const { email, displayName, updatedByEmail, notes } = req.body;
 
   if (!email || !displayName) {
     return res.status(400).json({ success: false, error: 'Missing required fields: email, displayName' });
   }
 
-  const standby = await standbyStorage.updateStandby(email, displayName, updatedByEmail);
+  const standby = await standbyStorage.updateStandby(email, displayName, updatedByEmail, notes);
 
   res.json({ success: true, standby, tokenResolved: standby.tokenResolved });
 });
@@ -157,6 +177,23 @@ router.get('/standby/history', async (req: Request, res: Response) => {
   const limit = Number.parseInt(req.query.limit as string) || 20;
   const history = await standbyStorage.getHandoverHistory(limit);
   res.json(history);
+});
+
+// ── Alert History ─────────────────────────────────────────────────────────────
+router.get('/alerts', async (req: Request, res: Response) => {
+  if (!fcm.isFirebaseReady()) return res.json([]);
+  try {
+    const limit = Number.parseInt(req.query.limit as string) || 50;
+    const snap = await admin.firestore()
+      .collection('alerts')
+      .orderBy('timestamp', 'desc')
+      .limit(limit)
+      .get();
+    res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  } catch (err) {
+    console.error('Failed to list alerts:', err);
+    res.json([]);
+  }
 });
 
 // ── Alert Sending ─────────────────────────────────────────────────────────────
@@ -392,6 +429,48 @@ router.post('/users/invite', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Failed to invite user:', err);
     res.status(500).json({ success: false, error: err.message ?? 'Failed to create user' });
+  }
+});
+
+// ── Alert Templates ───────────────────────────────────────────────────────────
+router.get('/alert-templates', async (_req: Request, res: Response) => {
+  if (!fcm.isFirebaseReady()) return res.json([]);
+  try {
+    const snap = await admin.firestore()
+      .collection('alert_templates')
+      .orderBy('createdAt', 'desc')
+      .get();
+    res.json(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  } catch { res.json([]); }
+});
+
+router.post('/alert-templates', async (req: Request, res: Response) => {
+  const { name, title, message, severity, channelId, channelName } = req.body;
+  if (!name || !title || !message) {
+    return res.status(400).json({ success: false, error: 'Missing required fields: name, title, message' });
+  }
+  if (!admin.apps.length) return res.status(503).json({ success: false, error: 'Firebase not available' });
+  try {
+    const ref = await admin.firestore().collection('alert_templates').add({
+      name, title, message,
+      severity: severity ?? 'WARNING',
+      channelId: channelId ?? 'core-monitoring',
+      channelName: channelName ?? 'Core Services Monitoring',
+      createdAt: Date.now(),
+    });
+    res.json({ success: true, id: ref.id });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/alert-templates/:id', async (req: Request, res: Response) => {
+  if (!admin.apps.length) return res.status(503).json({ success: false, error: 'Firebase not available' });
+  try {
+    await admin.firestore().collection('alert_templates').doc(req.params.id).delete();
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

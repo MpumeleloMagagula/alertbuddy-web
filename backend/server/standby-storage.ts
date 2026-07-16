@@ -68,12 +68,13 @@ export async function updateStandby(
   email: string,
   displayName: string,
   _updatedByEmail?: string,
+  notes?: string,
 ): Promise<StandbyInfo> {
   const prev = await getCurrentStandby();
 
   // Log handover when the person changes
   if (prev.onStandby && prev.email && prev.email !== email) {
-    void logHandover(prev.email, prev.displayName ?? prev.email, email, displayName);
+    void logHandover(prev.email, prev.displayName ?? prev.email, email, displayName, notes);
   }
 
   const fcmToken = await resolveTokenForEmail(email);

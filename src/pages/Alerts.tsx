@@ -16,6 +16,8 @@ import {
   XCircle,
   UserCheck,
   FileBarChart,
+  BookOpen,
+  Save,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../services/api';
@@ -32,6 +34,12 @@ export default function Alerts() {
 
   // Validation state
   const [fieldErrors, setFieldErrors] = useState({ title: false, message: false });
+
+  // Templates state
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
 
   // Filter and search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,6 +72,10 @@ export default function Alerts() {
   ];
 
   useEffect(() => {
+    // API call on mount so alerts load even when Firestore listener is blocked
+    api.getAlerts(100).then(a => { setAlerts(a); setIsLoading(false); }).catch(() => setIsLoading(false));
+    api.getAlertTemplates().then(t => setTemplates(t)).catch(() => {});
+
     const timeout = setTimeout(() => setIsLoading(false), 5000);
 
     const unsubAlerts = firebase.onAlertsChange((updatedAlerts: Alert[]) => {
@@ -151,6 +163,62 @@ export default function Alerts() {
       newSelected.add(id);
     }
     setSelectedIds(newSelected);
+  };
+
+  const handleAcknowledge = async (alertId: string) => {
+    try {
+      const userEmail = firebase.getCurrentUser()?.email ?? undefined;
+      await api.acknowledgeAlert(alertId, userEmail);
+      toast.success('Alert acknowledged');
+    } catch {
+      toast.error('Failed to acknowledge alert');
+    }
+  };
+
+  const handleLoadTemplate = (t: any) => {
+    setTestAlert({
+      title: t.title,
+      message: t.message,
+      severity: t.severity as Severity,
+      channelId: t.channelId,
+      channelName: t.channelName,
+    });
+    setFieldErrors({ title: false, message: false });
+    setShowTemplates(false);
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!testAlert.title.trim() || !templateName.trim()) {
+      toast.error('Enter a template name');
+      return;
+    }
+    try {
+      await api.createAlertTemplate({
+        name: templateName,
+        title: testAlert.title,
+        message: testAlert.message,
+        severity: testAlert.severity,
+        channelId: testAlert.channelId,
+        channelName: testAlert.channelName,
+      });
+      const updated = await api.getAlertTemplates();
+      setTemplates(updated);
+      setTemplateName('');
+      setShowSaveTemplate(false);
+      toast.success('Template saved');
+    } catch {
+      toast.error('Failed to save template');
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    try {
+      await api.deleteAlertTemplate(id);
+      setTemplates(ts => ts.filter(t => t.id !== id));
+      toast.success('Template deleted');
+    } catch {
+      toast.error('Failed to delete template');
+    }
   };
 
   const handleBulkMarkRead = async () => {
@@ -318,8 +386,57 @@ export default function Alerts() {
         <div className="lg:col-span-1 space-y-6">
           {/* Send Test Alert */}
           <div className="card">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Send Test Alert</h2>
-            
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Send Alert</h2>
+              <button
+                type="button"
+                onClick={() => setShowTemplates(v => !v)}
+                className={`flex items-center gap-1.5 text-sm font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
+                  showTemplates
+                    ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                <BookOpen className="w-4 h-4" />
+                Templates
+                {templates.length > 0 && (
+                  <span className="text-xs bg-primary-600 text-white rounded-full px-1.5 py-0.5 leading-none">{templates.length}</span>
+                )}
+              </button>
+            </div>
+
+            {/* Templates panel */}
+            {showTemplates && (
+              <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                {templates.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">No saved templates — fill in the form and click "Save as template"</p>
+                ) : (
+                  <div className="space-y-1">
+                    {templates.map(t => (
+                      <div key={t.id} className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleLoadTemplate(t)}
+                          className="flex-1 text-left text-sm px-3 py-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                        >
+                          <span className="font-medium">{t.name}</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">{t.severity}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTemplate(t.id)}
+                          aria-label="Delete template"
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -401,6 +518,32 @@ export default function Alerts() {
                   <TestTube className="w-4 h-4" /> Test Webhook
                 </button>
               </div>
+
+              {/* Save as template */}
+              {showSaveTemplate ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={templateName}
+                    onChange={e => setTemplateName(e.target.value)}
+                    placeholder="Template name..."
+                    className="input flex-1 text-sm py-1.5"
+                    autoFocus
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveTemplate(); if (e.key === 'Escape') { setShowSaveTemplate(false); setTemplateName(''); } }}
+                  />
+                  <button type="button" onClick={handleSaveTemplate} className="btn-primary text-sm py-1.5 px-3">Save</button>
+                  <button type="button" onClick={() => { setShowSaveTemplate(false); setTemplateName(''); }} className="btn-secondary text-sm py-1.5 px-3">Cancel</button>
+                </div>
+              ) : testAlert.title.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => setShowSaveTemplate(true)}
+                  className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  Save as template
+                </button>
+              ) : null}
 
               {/* Standby status pill */}
               <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
@@ -576,7 +719,7 @@ export default function Alerts() {
                           <Clock className="w-3 h-3" />
                           {new Date(alert.timestamp).toLocaleString()}
                         </span>
-                        {alert.isRead && (
+                        {alert.isRead ? (
                           <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
                             <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
                             <span>
@@ -593,6 +736,15 @@ export default function Alerts() {
                               )}
                             </span>
                           </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); handleAcknowledge(alert.id); }}
+                            className="flex items-center gap-1 text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Acknowledge
+                          </button>
                         )}
                       </div>
                     </div>

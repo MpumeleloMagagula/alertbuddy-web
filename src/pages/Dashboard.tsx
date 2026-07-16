@@ -25,6 +25,7 @@ export default function Dashboard() {
   useEffect(() => {
     loadDashboardData();
 
+    // Firestore listeners update data in real time when the connection is healthy
     const unsubscribeAlerts = firebase.onAlertsChange((alerts) => {
       setRecentAlerts(alerts.slice(0, 5));
       setAllAlerts(alerts);
@@ -34,16 +35,21 @@ export default function Dashboard() {
       setDeviceCount(devices.length);
     });
 
-    return () => {
-      unsubscribeAlerts();
-      unsubscribeDevices();
-    };
+    return () => { unsubscribeAlerts(); unsubscribeDevices(); };
   }, []);
 
   const loadDashboardData = async () => {
     try {
-      const status = await api.getServerStatus();
+      // All three in parallel — API calls work even when Firestore listeners are blocked
+      const [status, devices, alerts] = await Promise.all([
+        api.getServerStatus(),
+        api.getDevices(),
+        api.getAlerts(100),
+      ]);
       setServerStatus(status);
+      setDeviceCount(devices.length);
+      setAllAlerts(alerts);
+      setRecentAlerts(alerts.slice(0, 5));
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {

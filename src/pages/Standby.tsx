@@ -24,6 +24,7 @@ export default function Standby() {
   const [handoverLogs, setHandoverLogs] = useState<HandoverLog[]>([]);
   const [devices, setDevices] = useState<any[]>([]);
   const [selectedEmail, setSelectedEmail] = useState('');
+  const [handoverNotes, setHandoverNotes] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
@@ -78,7 +79,7 @@ export default function Standby() {
 
     try {
       setIsAssigning(true);
-      const result = await api.updateStandby(user.email, user.displayName, firebase.getCurrentUser()?.email ?? '');
+      const result = await api.updateStandby(user.email, user.displayName, firebase.getCurrentUser()?.email ?? '', handoverNotes || undefined);
       // Optimistic update so UI reflects assignment immediately, even if onSnapshot is slow
       setStandbyInfo({
         onStandby: true,
@@ -91,6 +92,7 @@ export default function Standby() {
       setTimeout(() => { api.getCurrentStandby().then(s => setStandbyInfo(s)).catch(() => {}); }, 1500);
       toast.success(`${user.displayName} is now on standby`);
       setSelectedEmail('');
+      setHandoverNotes('');
     } catch {
       toast.error('Failed to assign standby');
     } finally {
@@ -239,6 +241,14 @@ export default function Standby() {
                 </button>
               ))}
             </div>
+
+            <input
+              type="text"
+              value={handoverNotes}
+              onChange={e => setHandoverNotes(e.target.value)}
+              placeholder="Handover notes (optional)"
+              className="input text-sm"
+            />
 
             <button
               type="button"

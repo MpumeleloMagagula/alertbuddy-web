@@ -229,6 +229,8 @@ export default function Devices() {
   const [detailDevice, setDetailDevice] = useState<Device | null>(null);
 
   useEffect(() => {
+    api.getDevices().then(d => { setDevices(d as Device[]); setIsLoading(false); }).catch(() => setIsLoading(false));
+
     const unsubscribe = firebase.onDevicesChange((updatedDevices) => {
       setDevices(updatedDevices as Device[]);
       setIsLoading(false);

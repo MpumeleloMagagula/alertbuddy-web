@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import type {
   ApiResponse,
+  Alert,
   ServerStatus,
   Device,
   StandbyInfo,
@@ -52,17 +53,29 @@ class ApiService {
     return data;
   }
 
+  // ========== Alert History ==========
+  async getAlerts(limit: number = 50): Promise<Alert[]> {
+    const { data } = await this.api.get<Alert[]>(`/api/alerts?limit=${limit}`);
+    return data;
+  }
+
+  async acknowledgeAlert(alertId: string, acknowledgedBy?: string): Promise<ApiResponse> {
+    const { data } = await this.api.post<ApiResponse>(`/api/alerts/${alertId}/acknowledge`, {
+      acknowledgedBy,
+      acknowledgedAt: Date.now(),
+    });
+    return data;
+  }
+
   // ========== Standby Management ==========
   async getCurrentStandby(): Promise<StandbyInfo> {
     const { data } = await this.api.get<StandbyInfo>('/api/standby/current');
     return data;
   }
 
-  async updateStandby(email: string, displayName: string, updatedByEmail: string): Promise<ApiResponse> {
+  async updateStandby(email: string, displayName: string, updatedByEmail: string, notes?: string): Promise<ApiResponse> {
     const { data } = await this.api.post<ApiResponse>('/api/standby/update', {
-      email,
-      displayName,
-      updatedByEmail,
+      email, displayName, updatedByEmail, ...(notes ? { notes } : {}),
     });
     return data;
   }

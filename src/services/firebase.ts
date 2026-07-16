@@ -37,6 +37,14 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 class FirebaseService {
+  private _firestoreBlockedNotified = false;
+
+  private _notifyBlocked() {
+    if (this._firestoreBlockedNotified) return;
+    this._firestoreBlockedNotified = true;
+    window.dispatchEvent(new CustomEvent('firestore-blocked'));
+  }
+
   // ========== Authentication ==========
   async login(email: string, password: string): Promise<FirebaseUser> {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -69,6 +77,7 @@ class FirebaseService {
       callback(users);
     }, (error) => {
       console.error('Error listening to users:', error);
+      this._notifyBlocked();
       callback([]);
     });
   }
@@ -105,6 +114,7 @@ class FirebaseService {
       callback(alerts);
     }, (error) => {
       console.error('Error listening to alerts:', error);
+      this._notifyBlocked();
       callback([]);
     });
   }
@@ -130,6 +140,7 @@ class FirebaseService {
       callback(members);
     }, (error) => {
       console.error('Error listening to team members:', error);
+      this._notifyBlocked();
       callback([]);
     });
   }
@@ -155,6 +166,7 @@ class FirebaseService {
       callback(logs);
     }, (error) => {
       console.error('Error listening to handover logs:', error);
+      this._notifyBlocked();
       callback([]);
     });
   }
@@ -168,6 +180,7 @@ class FirebaseService {
       callback(logs);
     }, (error) => {
       console.error('Error listening to audit logs:', error);
+      this._notifyBlocked();
       callback([]);
     });
   }
@@ -192,6 +205,7 @@ class FirebaseService {
       callback(devices);
     }, (error) => {
       console.error('Error listening to devices:', error);
+      this._notifyBlocked();
       callback([]);
     });
   }
