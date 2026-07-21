@@ -534,16 +534,18 @@ export default function Alerts() {
                   <button type="button" onClick={handleSaveTemplate} className="btn-primary text-sm py-1.5 px-3">Save</button>
                   <button type="button" onClick={() => { setShowSaveTemplate(false); setTemplateName(''); }} className="btn-secondary text-sm py-1.5 px-3">Cancel</button>
                 </div>
-              ) : testAlert.title.trim() ? (
+              ) : (
                 <button
                   type="button"
                   onClick={() => setShowSaveTemplate(true)}
-                  className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                  disabled={!testAlert.title.trim()}
+                  title={!testAlert.title.trim() ? 'Fill in a title first' : undefined}
+                  className="btn-secondary w-full flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <Save className="w-3.5 h-3.5" />
+                  <Save className="w-4 h-4" />
                   Save as template
                 </button>
-              ) : null}
+              )}
 
               {/* Standby status pill */}
               <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
