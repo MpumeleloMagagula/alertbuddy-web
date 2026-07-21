@@ -3,6 +3,8 @@ import admin from 'firebase-admin';
 import * as fcm from './fcm.js';
 import * as deviceStorage from './device-storage.js';
 import * as standbyStorage from './standby-storage.js';
+import type { StandbyInfo } from './standby-storage.js';
+import * as mailer from './mailer.js';
 import * as grafana from './grafana.js';
 
 const router = Router();
@@ -150,6 +152,30 @@ router.get('/devices', async (_req: Request, res: Response) => {
   res.json(devices);
 });
 
+// Fires push + email in background so the HTTP response is not delayed
+async function sendStandbyNotifications(standby: StandbyInfo, email: string, displayName: string) {
+  const jobs: Promise<unknown>[] = [];
+
+  if (standby.tokenResolved && standby.fcmToken) {
+    jobs.push(
+      fcm.sendToToken(
+        standby.fcmToken,
+        { title: "You're now on standby", body: 'Alerts from Alert Buddy will be routed to your device.' },
+        { alertId: `standby-notify-${Date.now()}`, channelId: 'general', channelName: 'General', severity: 'INFO', source: 'System' },
+      ).then(ok => console.log(`🔔 Standby push → ${email}: ${ok ? 'sent' : 'failed'}`)),
+    );
+  } else {
+    console.log(`⚠️  No FCM token for ${email} — push skipped`);
+  }
+
+  jobs.push(
+    mailer.sendStandbyAssignedEmail(email, displayName)
+      .then(ok => console.log(`📧 Standby email → ${email}: ${ok ? 'sent' : 'not configured'}`)),
+  );
+
+  await Promise.all(jobs);
+}
+
 // ── Standby Management ────────────────────────────────────────────────────────
 router.get('/standby/current', async (_req: Request, res: Response) => {
   const standby = await standbyStorage.getCurrentStandby();
@@ -164,6 +190,9 @@ router.post('/standby/update', async (req: Request, res: Response) => {
   }
 
   const standby = await standbyStorage.updateStandby(email, displayName, updatedByEmail, notes);
+
+  // Send push + email in background — don't block the HTTP response
+  void sendStandbyNotifications(standby, email, displayName);
 
   res.json({ success: true, standby, tokenResolved: standby.tokenResolved });
 });
