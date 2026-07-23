@@ -7,6 +7,7 @@ import type { StandbyInfo } from './standby-storage.js';
 import * as mailer from './mailer.js';
 import * as grafana from './grafana.js';
 import { requireBasicAuth } from './basic-auth.js';
+import { logAuditAction } from './enhanced-features.js';
 
 const router = Router();
 
@@ -117,6 +118,14 @@ router.post('/devices/register', async (req: Request, res: Response) => {
     }
   }
 
+  await logAuditAction({
+    action: 'DEVICE_REGISTERED',
+    performedBy: email,
+    performedByEmail: email,
+    description: `Device registered: ${deviceName ?? deviceId}`,
+    metadata: { deviceId, manufacturer, deviceModel },
+  });
+
   res.json({ success: true, device });
 });
 
@@ -127,6 +136,7 @@ router.post('/devices/unregister', async (req: Request, res: Response) => {
     return res.status(400).json({ success: false, error: 'Missing required field: deviceId' });
   }
 
+  const existing = deviceStorage.getDeviceById(deviceId);
   const success = deviceStorage.unregisterDevice(deviceId);
 
   if (success && fcm.isFirebaseReady()) {
@@ -136,6 +146,16 @@ router.post('/devices/unregister', async (req: Request, res: Response) => {
     } catch (err) {
       console.error('Failed to delete device from Firestore:', err);
     }
+  }
+
+  if (success) {
+    await logAuditAction({
+      action: 'DEVICE_UNREGISTERED',
+      performedBy: existing?.email ?? 'unknown',
+      performedByEmail: existing?.email ?? 'unknown',
+      description: `Device unregistered: ${deviceId}`,
+      metadata: { deviceId },
+    });
   }
 
   res.json({ success, message: success ? 'Device unregistered' : 'Device not found' });
@@ -195,11 +215,32 @@ router.post('/standby/update', async (req: Request, res: Response) => {
   // Send push + email in background — don't block the HTTP response
   void sendStandbyNotifications(standby, email, displayName);
 
+  await logAuditAction({
+    action: 'STANDBY_UPDATE',
+    performedBy: updatedByEmail ?? displayName,
+    performedByEmail: updatedByEmail ?? email,
+    description: `Standby assigned to ${displayName}`,
+    metadata: { email, notes: notes ?? null },
+  });
+
   res.json({ success: true, standby, tokenResolved: standby.tokenResolved });
 });
 
-router.delete('/standby', async (_req: Request, res: Response) => {
+router.delete('/standby', async (req: Request, res: Response) => {
+  const clearedByEmail = req.query.clearedByEmail as string | undefined;
+  const previous = await standbyStorage.getCurrentStandby();
   const standby = await standbyStorage.clearStandby();
+
+  if (previous.onStandby) {
+    await logAuditAction({
+      action: 'STANDBY_UPDATE',
+      performedBy: clearedByEmail ?? 'unknown',
+      performedByEmail: clearedByEmail ?? 'unknown',
+      description: `Standby cleared (was ${previous.displayName ?? previous.email})`,
+      metadata: { previousEmail: previous.email ?? null },
+    });
+  }
+
   res.json({ success: true, standby });
 });
 
@@ -228,7 +269,7 @@ router.get('/alerts', async (req: Request, res: Response) => {
 
 // ── Alert Sending ─────────────────────────────────────────────────────────────
 router.post('/alerts/send', async (req: Request, res: Response) => {
-  const { title, message, severity, channelId, channelName } = req.body;
+  const { title, message, severity, channelId, channelName, sentByEmail } = req.body;
 
   if (!title || !message) {
     return res.status(400).json({ success: false, error: 'Missing required fields: title, message' });
@@ -253,11 +294,19 @@ router.post('/alerts/send', async (req: Request, res: Response) => {
 
   await saveAlertToFirestore({ alertId, title, body: message, severity: resolvedSeverity, channelId: resolvedChannelId, channelName: resolvedChannelName, source: 'Manual' });
 
+  await logAuditAction({
+    action: 'ALERT_SENT',
+    performedBy: sentByEmail ?? 'unknown',
+    performedByEmail: sentByEmail ?? 'unknown',
+    description: `Sent alert to all devices: ${title}`,
+    metadata: { alertId, sentTo: tokens.length },
+  });
+
   res.json({ success: true, sent: result.successCount, failed: result.failureCount, totalDevices: tokens.length });
 });
 
 router.post('/alerts/send-standby', async (req: Request, res: Response) => {
-  const { title, message, severity, channelId, channelName } = req.body;
+  const { title, message, severity, channelId, channelName, sentByEmail } = req.body;
 
   if (!title || !message) {
     return res.status(400).json({ success: false, error: 'Missing required fields: title, message' });
@@ -282,6 +331,13 @@ router.post('/alerts/send-standby', async (req: Request, res: Response) => {
 
   if (success) {
     await saveAlertToFirestore({ alertId, title, body: message, severity: resolvedSeverity, channelId: resolvedChannelId, channelName: resolvedChannelName, source: 'Manual' });
+    await logAuditAction({
+      action: 'ALERT_SENT',
+      performedBy: sentByEmail ?? 'unknown',
+      performedByEmail: sentByEmail ?? 'unknown',
+      description: `Sent alert to standby (${standby.email}): ${title}`,
+      metadata: { alertId, sentTo: standby.email },
+    });
   }
 
   res.json({ success, sentTo: standby.email });
@@ -304,7 +360,7 @@ router.post('/alerts/send-topic', async (req: Request, res: Response) => {
 });
 
 router.post('/alerts/send-to-device', async (req: Request, res: Response) => {
-  const { fcmToken, title, message, severity, channelId, channelName } = req.body;
+  const { fcmToken, title, message, severity, channelId, channelName, sentByEmail } = req.body;
 
   if (!fcmToken || !title || !message) {
     return res.status(400).json({ success: false, error: 'Missing required fields: fcmToken, title, message' });
@@ -323,6 +379,13 @@ router.post('/alerts/send-to-device', async (req: Request, res: Response) => {
 
   if (success) {
     await saveAlertToFirestore({ alertId, title, body: message, severity: resolvedSeverity, channelId: resolvedChannelId, channelName: resolvedChannelName, source: 'Manual' });
+    await logAuditAction({
+      action: 'ALERT_SENT',
+      performedBy: sentByEmail ?? 'unknown',
+      performedByEmail: sentByEmail ?? 'unknown',
+      description: `Sent alert to device: ${title}`,
+      metadata: { alertId, fcmToken: fcmToken.slice(0, 20) + '...' },
+    });
   }
 
   res.json({ success, sentTo: fcmToken.slice(0, 20) + '...' });
@@ -365,6 +428,15 @@ router.post('/alerts/bulk-mark-read', async (req: Request, res: Response) => {
       });
     });
     await batch.commit();
+
+    await logAuditAction({
+      action: 'ALERT_UPDATED',
+      performedBy: userEmail ?? 'unknown',
+      performedByEmail: userEmail ?? 'unknown',
+      description: `Marked ${alertIds.length} alert(s) as read`,
+      metadata: { alertCount: alertIds.length },
+    });
+
     res.json({ success: true, updated: alertIds.length });
   } catch (err) {
     console.error('Bulk mark-read error:', err);
@@ -373,7 +445,7 @@ router.post('/alerts/bulk-mark-read', async (req: Request, res: Response) => {
 });
 
 router.post('/alerts/bulk-delete', async (req: Request, res: Response) => {
-  const { alertIds } = req.body as { alertIds: string[] };
+  const { alertIds, userEmail } = req.body as { alertIds: string[]; userEmail?: string };
 
   if (!Array.isArray(alertIds) || alertIds.length === 0) {
     return res.status(400).json({ success: false, error: 'alertIds array required' });
@@ -384,6 +456,15 @@ router.post('/alerts/bulk-delete', async (req: Request, res: Response) => {
     const batch = admin.firestore().batch();
     alertIds.forEach(id => batch.delete(admin.firestore().collection('alerts').doc(id)));
     await batch.commit();
+
+    await logAuditAction({
+      action: 'ALERT_DELETED',
+      performedBy: userEmail ?? 'unknown',
+      performedByEmail: userEmail ?? 'unknown',
+      description: `Deleted ${alertIds.length} alert(s)`,
+      metadata: { alertCount: alertIds.length },
+    });
+
     res.json({ success: true, deleted: alertIds.length });
   } catch (err) {
     console.error('Bulk delete error:', err);
@@ -393,7 +474,7 @@ router.post('/alerts/bulk-delete', async (req: Request, res: Response) => {
 
 // ── User Invite ───────────────────────────────────────────────────────────────
 router.post('/users/invite', async (req: Request, res: Response) => {
-  const { email, displayName, role } = req.body;
+  const { email, displayName, role, invitedByEmail } = req.body;
 
   if (!email || !displayName) {
     return res.status(400).json({ success: false, error: 'Missing required fields: email, displayName' });
@@ -455,6 +536,15 @@ router.post('/users/invite', async (req: Request, res: Response) => {
     }
 
     console.log(`✉️  User invited: ${email}, email sent: ${emailSent}`);
+
+    await logAuditAction({
+      action: 'USER_CREATED',
+      performedBy: invitedByEmail ?? 'unknown',
+      performedByEmail: invitedByEmail ?? 'unknown',
+      description: `Invited user: ${email}`,
+      metadata: { email, role: role ?? 'USER' },
+    });
+
     res.json({ success: true, uid, inviteLink, emailSent });
   } catch (err: any) {
     console.error('Failed to invite user:', err);
@@ -475,7 +565,7 @@ router.get('/alert-templates', async (_req: Request, res: Response) => {
 });
 
 router.post('/alert-templates', async (req: Request, res: Response) => {
-  const { name, title, message, severity, channelId, channelName } = req.body;
+  const { name, title, message, severity, channelId, channelName, savedByEmail } = req.body;
   if (!name || !title || !message) {
     return res.status(400).json({ success: false, error: 'Missing required fields: name, title, message' });
   }
@@ -488,6 +578,15 @@ router.post('/alert-templates', async (req: Request, res: Response) => {
       channelName: channelName ?? 'Core Services Monitoring',
       createdAt: Date.now(),
     });
+
+    await logAuditAction({
+      action: 'SETTINGS_CHANGED',
+      performedBy: savedByEmail ?? 'unknown',
+      performedByEmail: savedByEmail ?? 'unknown',
+      description: `Created alert template: ${name}`,
+      metadata: { templateId: ref.id, templateName: name },
+    });
+
     res.json({ success: true, id: ref.id });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -497,7 +596,17 @@ router.post('/alert-templates', async (req: Request, res: Response) => {
 router.delete('/alert-templates/:id', async (req: Request, res: Response) => {
   if (!admin.apps.length) return res.status(503).json({ success: false, error: 'Firebase not available' });
   try {
+    const deletedByEmail = req.query.deletedByEmail as string | undefined;
     await admin.firestore().collection('alert_templates').doc(req.params.id).delete();
+
+    await logAuditAction({
+      action: 'SETTINGS_CHANGED',
+      performedBy: deletedByEmail ?? 'unknown',
+      performedByEmail: deletedByEmail ?? 'unknown',
+      description: `Deleted alert template: ${req.params.id}`,
+      metadata: { templateId: req.params.id },
+    });
+
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

@@ -104,7 +104,7 @@ export default function Standby() {
     if (!confirm('Remove the current standby assignment?')) return;
     try {
       setIsClearing(true);
-      await api.clearStandby();
+      await api.clearStandby(firebase.getCurrentUser()?.email ?? undefined);
       // Optimistic update
       setStandbyInfo({ onStandby: false, tokenResolved: false, updatedAt: Date.now() });
       toast.success('Standby cleared');

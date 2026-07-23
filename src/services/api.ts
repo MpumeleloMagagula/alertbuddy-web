@@ -80,8 +80,10 @@ class ApiService {
     return data;
   }
 
-  async clearStandby(): Promise<ApiResponse> {
-    const { data } = await this.api.delete<ApiResponse>('/api/standby');
+  async clearStandby(clearedByEmail?: string): Promise<ApiResponse> {
+    const { data } = await this.api.delete<ApiResponse>('/api/standby', {
+      params: clearedByEmail ? { clearedByEmail } : undefined,
+    });
     return data;
   }
 
@@ -91,18 +93,18 @@ class ApiService {
   }
 
   // ========== Alert Management ==========
-  async sendTestAlert(alertData: TestAlertFormData): Promise<ApiResponse> {
-    const { data } = await this.api.post<ApiResponse>('/api/alerts/send', alertData);
+  async sendTestAlert(alertData: TestAlertFormData, sentByEmail?: string): Promise<ApiResponse> {
+    const { data } = await this.api.post<ApiResponse>('/api/alerts/send', { ...alertData, sentByEmail });
     return data;
   }
 
-  async sendToDevice(fcmToken: string, alertData: TestAlertFormData): Promise<ApiResponse> {
-    const { data } = await this.api.post<ApiResponse>('/api/alerts/send-to-device', { fcmToken, ...alertData });
+  async sendToDevice(fcmToken: string, alertData: TestAlertFormData, sentByEmail?: string): Promise<ApiResponse> {
+    const { data } = await this.api.post<ApiResponse>('/api/alerts/send-to-device', { fcmToken, ...alertData, sentByEmail });
     return data;
   }
 
-  async sendStandbyAlert(alertData: TestAlertFormData): Promise<ApiResponse> {
-    const { data } = await this.api.post<ApiResponse>('/api/alerts/send-standby', alertData);
+  async sendStandbyAlert(alertData: TestAlertFormData, sentByEmail?: string): Promise<ApiResponse> {
+    const { data } = await this.api.post<ApiResponse>('/api/alerts/send-standby', { ...alertData, sentByEmail });
     return data;
   }
 
@@ -126,8 +128,8 @@ class ApiService {
     return data;
   }
 
-  async inviteUser(userData: { email: string; displayName: string; role: string }): Promise<{ success: boolean; inviteLink?: string; emailSent?: boolean; error?: string }> {
-    const { data } = await this.api.post('/api/users/invite', userData);
+  async inviteUser(userData: { email: string; displayName: string; role: string }, invitedByEmail?: string): Promise<{ success: boolean; inviteLink?: string; emailSent?: boolean; error?: string }> {
+    const { data } = await this.api.post('/api/users/invite', { ...userData, invitedByEmail });
     return data;
   }
 
@@ -136,13 +138,15 @@ class ApiService {
     return data;
   }
 
-  async updateUser(userId: string, userData: Partial<User>): Promise<ApiResponse<User>> {
-    const { data } = await this.api.put<ApiResponse<User>>(`/api/users/${userId}`, userData);
+  async updateUser(userId: string, userData: Partial<User>, adminEmail?: string): Promise<ApiResponse<User>> {
+    const { data } = await this.api.put<ApiResponse<User>>(`/api/users/${userId}`, { ...userData, adminEmail });
     return data;
   }
 
-  async deleteUser(userId: string): Promise<ApiResponse> {
-    const { data} = await this.api.delete<ApiResponse>(`/api/users/${userId}`);
+  async deleteUser(userId: string, adminEmail?: string): Promise<ApiResponse> {
+    const { data } = await this.api.delete<ApiResponse>(`/api/users/${userId}`, {
+      params: adminEmail ? { adminEmail } : undefined,
+    });
     return data;
   }
 
@@ -204,13 +208,15 @@ class ApiService {
     return data;
   }
 
-  async createAlertTemplate(templateData: any): Promise<any> {
-    const { data } = await this.api.post('/api/alert-templates', templateData);
+  async createAlertTemplate(templateData: any, savedByEmail?: string): Promise<any> {
+    const { data } = await this.api.post('/api/alert-templates', { ...templateData, savedByEmail });
     return data;
   }
 
-  async deleteAlertTemplate(templateId: string): Promise<any> {
-    const { data } = await this.api.delete(`/api/alert-templates/${templateId}`);
+  async deleteAlertTemplate(templateId: string, deletedByEmail?: string): Promise<any> {
+    const { data } = await this.api.delete(`/api/alert-templates/${templateId}`, {
+      params: deletedByEmail ? { deletedByEmail } : undefined,
+    });
     return data;
   }
 }

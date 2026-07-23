@@ -17,7 +17,7 @@ import api from '../services/api';
 
 interface AuditLogEntry {
   id: string;
-  action: 'ALERT_SENT' | 'STANDBY_UPDATE' | 'USER_CREATED' | 'DEVICE_REGISTERED' | 'ALERT_DELETED' | 'ALERT_UPDATED' | 'SETTINGS_CHANGED';
+  action: 'ALERT_SENT' | 'STANDBY_UPDATE' | 'USER_CREATED' | 'USER_UPDATED' | 'USER_DELETED' | 'DEVICE_REGISTERED' | 'DEVICE_UNREGISTERED' | 'ALERT_DELETED' | 'ALERT_UPDATED' | 'SETTINGS_CHANGED';
   performedBy: string;
   performedByEmail: string;
   description: string;
@@ -101,8 +101,12 @@ export default function AuditLog() {
       case 'STANDBY_UPDATE':
         return UserCheck;
       case 'USER_CREATED':
+      case 'USER_UPDATED':
         return User;
+      case 'USER_DELETED':
+        return Trash2;
       case 'DEVICE_REGISTERED':
+      case 'DEVICE_UNREGISTERED':
         return Smartphone;
       case 'ALERT_DELETED':
         return Trash2;
@@ -122,8 +126,12 @@ export default function AuditLog() {
       case 'STANDBY_UPDATE':
         return 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300';
       case 'USER_CREATED':
+      case 'USER_UPDATED':
         return 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300';
+      case 'USER_DELETED':
+        return 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300';
       case 'DEVICE_REGISTERED':
+      case 'DEVICE_UNREGISTERED':
         return 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300';
       case 'ALERT_DELETED':
         return 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300';
@@ -233,10 +241,14 @@ export default function AuditLog() {
             >
               <option value="ALL">All Actions</option>
               <option value="ALERT_SENT">Alert Sent</option>
+              <option value="ALERT_UPDATED">Alert Updated</option>
+              <option value="ALERT_DELETED">Alert Deleted</option>
               <option value="STANDBY_UPDATE">Standby Update</option>
               <option value="USER_CREATED">User Created</option>
+              <option value="USER_UPDATED">User Updated</option>
+              <option value="USER_DELETED">User Deleted</option>
               <option value="DEVICE_REGISTERED">Device Registered</option>
-              <option value="ALERT_DELETED">Alert Deleted</option>
+              <option value="DEVICE_UNREGISTERED">Device Unregistered</option>
               <option value="SETTINGS_CHANGED">Settings Changed</option>
             </select>
           </div>

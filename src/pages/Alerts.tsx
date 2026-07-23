@@ -200,7 +200,7 @@ export default function Alerts() {
         severity: testAlert.severity,
         channelId: testAlert.channelId,
         channelName: testAlert.channelName,
-      });
+      }, firebase.getCurrentUser()?.email ?? undefined);
       const updated = await api.getAlertTemplates();
       setTemplates(updated);
       setTemplateName('');
@@ -213,7 +213,7 @@ export default function Alerts() {
 
   const handleDeleteTemplate = async (id: string) => {
     try {
-      await api.deleteAlertTemplate(id);
+      await api.deleteAlertTemplate(id, firebase.getCurrentUser()?.email ?? undefined);
       setTemplates(ts => ts.filter(t => t.id !== id));
       toast.success('Template deleted');
     } catch {
@@ -244,7 +244,8 @@ export default function Alerts() {
 
     try {
       setIsSending(true);
-      await api.bulkDeleteAlerts(Array.from(selectedIds));
+      const currentUserEmail = firebase.getCurrentUser()?.email ?? undefined;
+      await api.bulkDeleteAlerts(Array.from(selectedIds), undefined, currentUserEmail);
       toast.success(`Deleted ${selectedIds.size} alerts`);
       setSelectedIds(new Set());
     } catch (error) {
@@ -273,7 +274,7 @@ export default function Alerts() {
     if (!validateForm()) return;
     try {
       setIsSending(true);
-      const result = await api.sendTestAlert(testAlert);
+      const result = await api.sendTestAlert(testAlert, firebase.getCurrentUser()?.email ?? undefined);
       if (result.success === false) throw new Error((result as any).error ?? 'No registered devices');
       toast.success('Alert sent to all devices');
       resetForm();
@@ -298,7 +299,7 @@ export default function Alerts() {
 
     try {
       setIsSending(true);
-      const result = await api.sendStandbyAlert(testAlert);
+      const result = await api.sendStandbyAlert(testAlert, firebase.getCurrentUser()?.email ?? undefined);
       if (result.success === false) throw new Error((result as any).error ?? 'Failed to send');
       toast.success(`Alert sent to ${standbyInfo.displayName ?? 'standby person'}`);
       resetForm();

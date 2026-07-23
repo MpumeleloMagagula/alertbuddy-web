@@ -15,7 +15,6 @@ import {
   getDocs,
   addDoc,
   updateDoc,
-  deleteDoc,
   doc,
   orderBy,
   limit,
@@ -86,16 +85,6 @@ class FirebaseService {
     const usersRef = collection(db, 'users');
     const docRef = await addDoc(usersRef, userData);
     return docRef.id;
-  }
-
-  async updateUser(userId: string, userData: Partial<User>): Promise<void> {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, userData);
-  }
-
-  async deleteUser(userId: string): Promise<void> {
-    const userRef = doc(db, 'users', userId);
-    await deleteDoc(userRef);
   }
 
   // ========== Alerts (Firestore) ==========

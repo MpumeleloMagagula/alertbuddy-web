@@ -269,7 +269,7 @@ export default function Devices() {
         severity: notifyForm.severity as any,
         channelId: notifyForm.channelId,
         channelName: notifyForm.channelName,
-      });
+      }, firebase.getCurrentUser()?.email ?? undefined);
       toast.success(`Notification sent to ${device.email}`);
       setExpandedDeviceId(null);
       setNotifyForm(defaultForm());

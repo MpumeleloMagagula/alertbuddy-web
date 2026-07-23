@@ -67,7 +67,7 @@ export default function Users() {
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     try {
-      await firebase.deleteUser(userId);
+      await api.deleteUser(userId, firebase.getCurrentUser()?.email ?? undefined);
       toast.success('User deleted successfully');
     } catch {
       toast.error('Failed to delete user');
@@ -95,7 +95,7 @@ export default function Users() {
     }
     try {
       setIsInviting(true);
-      const result = await api.inviteUser(inviteForm);
+      const result = await api.inviteUser(inviteForm, firebase.getCurrentUser()?.email ?? undefined);
       if (!result.success) throw new Error(result.error ?? 'Invite failed');
       setInviteResult({ inviteLink: result.inviteLink ?? '', emailSent: result.emailSent ?? false });
       toast.success(`Account created for ${inviteForm.email}`);
@@ -123,7 +123,7 @@ export default function Users() {
     if (!editingUser) return;
     try {
       setIsSavingEdit(true);
-      await firebase.updateUser(editingUser.id, editForm);
+      await api.updateUser(editingUser.id, editForm, firebase.getCurrentUser()?.email ?? undefined);
       toast.success('User updated');
       setEditingUser(null);
     } catch {
