@@ -191,8 +191,14 @@ Content-Type: application/json
 
 ### Grafana Webhook
 
+Requires HTTP Basic Auth. Set `GRAFANA_WEBHOOK_USER` / `GRAFANA_WEBHOOK_PASSWORD` in the
+server environment and configure the same credentials as Basic Auth on the Grafana
+contact point — requests without them are rejected with `401`, and the endpoint
+returns `500` if the server-side env vars aren't set at all.
+
 ```bash
 POST /api/grafana/webhook
+Authorization: Basic base64(user:password)
 Content-Type: application/json
 
 {
@@ -266,6 +272,7 @@ curl -X POST http://localhost:5000/api/alerts/send \
 
 ```bash
 curl -X POST http://localhost:5000/api/grafana/webhook \
+  -u grafana:change-me \
   -H "Content-Type: application/json" \
   -d '{
     "receiver": "alert-buddy",

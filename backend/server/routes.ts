@@ -6,6 +6,7 @@ import * as standbyStorage from './standby-storage.js';
 import type { StandbyInfo } from './standby-storage.js';
 import * as mailer from './mailer.js';
 import * as grafana from './grafana.js';
+import { requireBasicAuth } from './basic-auth.js';
 
 const router = Router();
 
@@ -504,7 +505,7 @@ router.delete('/alert-templates/:id', async (req: Request, res: Response) => {
 });
 
 // ── Grafana Webhook ───────────────────────────────────────────────────────────
-router.post('/grafana/webhook', async (req: Request, res: Response) => {
+router.post('/grafana/webhook', requireBasicAuth, async (req: Request, res: Response) => {
   if (!grafana.validateGrafanaPayload(req.body)) {
     return res.status(400).json({ success: false, error: 'Invalid Grafana webhook payload' });
   }
@@ -541,6 +542,12 @@ router.post('/grafana/webhook', async (req: Request, res: Response) => {
         results.push({ alert: alert.title, sentTo: 'all', successCount: result.successCount, failureCount: result.failureCount });
       }
     }
+
+    await saveAlertToFirestore({
+      alertId: alert.alertId, title: alert.title, body: alert.message,
+      severity: alert.severity, channelId: alert.channelId, channelName: alert.channelName,
+      source: alert.source,
+    });
   }
 
   res.json({ success: true, processed: parsedAlerts.length, results });
