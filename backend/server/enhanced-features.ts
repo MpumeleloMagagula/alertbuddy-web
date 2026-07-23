@@ -196,14 +196,17 @@ router.post('/users', async (req, res) => {
 router.put('/users/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const userData = req.body;
+    const { adminId, adminEmail, ...userData } = req.body;
 
-    await getDb().collection('users').doc(userId).update(userData);
+    // set+merge (not update) so this also works as an upsert for a user's
+    // own profile/notification-preference edits, even if their Firestore
+    // doc doesn't exist yet
+    await getDb().collection('users').doc(userId).set(userData, { merge: true });
 
     await logAuditAction({
       action: 'USER_UPDATED',
-      performedBy: req.body.adminId || 'admin',
-      performedByEmail: req.body.adminEmail || 'admin@alertbuddy.com',
+      performedBy: adminEmail || adminId || 'unknown',
+      performedByEmail: adminEmail || 'unknown',
       description: `Updated user: ${userId}`,
       metadata: { userId, updates: Object.keys(userData) },
     });

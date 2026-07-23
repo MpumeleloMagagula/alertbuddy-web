@@ -28,6 +28,10 @@ export default function Standby() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
+  // Handover history pagination state
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyPageSize = 5;
+
   useEffect(() => {
     // API calls on mount so the page has data immediately, even when
     // Firestore client-side listeners are blocked (e.g. by an ad blocker)
@@ -35,7 +39,7 @@ export default function Standby() {
       setStandbyInfo({ onStandby: false, tokenResolved: false, updatedAt: 0 });
     });
     api.getDevices().then(devs => setDevices(devs)).catch(() => {});
-    api.getHandoverHistory(15).then(logs => setHandoverLogs(logs)).catch(() => {});
+    api.getHandoverHistory(100).then(logs => setHandoverLogs(logs)).catch(() => {});
 
     // Real-time Firestore listeners — will override the API data when they connect
     const unsubStandby = firebase.onStandbyChange((info) => {
@@ -43,13 +47,19 @@ export default function Standby() {
     });
     const unsubLogs = firebase.onHandoverLogsChange((logs) => {
       setHandoverLogs(logs);
-    }, 15);
+    }, 100);
     const unsubDevices = firebase.onDevicesChange((devs) => {
       setDevices(devs);
     });
 
     return () => { unsubStandby(); unsubLogs(); unsubDevices(); };
   }, []);
+
+  const historyTotalPages = Math.max(1, Math.ceil(handoverLogs.length / historyPageSize));
+  const paginatedHandoverLogs = useMemo(() => {
+    const start = (historyPage - 1) * historyPageSize;
+    return handoverLogs.slice(start, start + historyPageSize);
+  }, [handoverLogs, historyPage]);
 
   // Deduplicate by email — one entry per person, most recently seen device
   const registeredUsers = useMemo<RegisteredUser[]>(() => {
@@ -276,26 +286,62 @@ export default function Standby() {
             <p className="text-sm">No handovers yet</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {handoverLogs.map(log => (
-              <div
-                key={log.id}
-                className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-semibold text-gray-900 dark:text-white">{log.fromUserName}</span>
-                    <ArrowRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                    <span className="font-semibold text-gray-900 dark:text-white">{log.toUserName}</span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    <span>{new Date(log.handoverAt).toLocaleString()}</span>
-                    {log.notes && <><span>·</span><span>{log.notes}</span></>}
+          <>
+            <div className="space-y-2">
+              {paginatedHandoverLogs.map(log => (
+                <div
+                  key={log.id}
+                  className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-semibold text-gray-900 dark:text-white">{log.fromUserName}</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      <span className="font-semibold text-gray-900 dark:text-white">{log.toUserName}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      <span>{new Date(log.handoverAt).toLocaleString()}</span>
+                      {log.notes && <><span>·</span><span>{log.notes}</span></>}
+                    </div>
                   </div>
                 </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {historyTotalPages > 1 && (
+              <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Showing{' '}
+                  <span className="font-semibold text-gray-700 dark:text-gray-300">
+                    {(historyPage - 1) * historyPageSize + 1}–{Math.min(historyPage * historyPageSize, handoverLogs.length)}
+                  </span>{' '}
+                  of <span className="font-semibold text-gray-700 dark:text-gray-300">{handoverLogs.length}</span>
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                    disabled={historyPage === 1}
+                    className="px-2.5 py-1 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ‹ Prev
+                  </button>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 px-2">
+                    Page {historyPage} of {historyTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryPage(p => Math.min(historyTotalPages, p + 1))}
+                    disabled={historyPage === historyTotalPages}
+                    className="px-2.5 py-1 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next ›
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 

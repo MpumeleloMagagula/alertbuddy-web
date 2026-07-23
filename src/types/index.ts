@@ -17,6 +17,10 @@ export enum Severity {
   INFO = 'INFO',
 }
 
+export interface NotificationPreferences {
+  emailOnStandbyAssigned: boolean;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -27,6 +31,7 @@ export interface User {
   phoneNumber?: string;
   createdAt: number;
   isActive: boolean;
+  notificationPreferences?: NotificationPreferences;
 }
 
 export interface TeamMember {
@@ -82,6 +87,23 @@ export interface StandbyInfo {
   fcmToken?: string;
   tokenResolved: boolean;
   updatedAt: number;
+}
+
+export type AuditLogAction =
+  | 'ALERT_SENT' | 'ALERT_UPDATED' | 'ALERT_DELETED'
+  | 'STANDBY_UPDATE'
+  | 'USER_CREATED' | 'USER_UPDATED' | 'USER_DELETED'
+  | 'DEVICE_REGISTERED' | 'DEVICE_UNREGISTERED'
+  | 'SETTINGS_CHANGED';
+
+export interface AuditLogEntry {
+  id: string;
+  action: AuditLogAction;
+  performedBy: string;
+  performedByEmail: string;
+  description: string;
+  timestamp: number;
+  metadata?: any;
 }
 
 export interface HandoverLog {

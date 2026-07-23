@@ -16,6 +16,7 @@ const Standby   = lazy(() => import('./pages/Standby'));
 const Alerts    = lazy(() => import('./pages/Alerts'));
 const Devices   = lazy(() => import('./pages/Devices'));
 const AuditLog  = lazy(() => import('./pages/AuditLog'));
+const Settings  = lazy(() => import('./pages/Settings'));
 import Login from './pages/Login';
 
 function App() {
@@ -62,6 +63,7 @@ function App() {
             <Route path="alerts" element={<Alerts />} />
             <Route path="devices" element={<Devices />} />
             <Route path="audit-log" element={<AuditLog />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

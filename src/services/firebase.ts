@@ -5,6 +5,15 @@ import {
   signOut,
   onAuthStateChanged,
   User as FirebaseUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+  multiFactor,
+  getMultiFactorResolver,
+  TotpMultiFactorGenerator,
+  TotpSecret,
+  MultiFactorResolver,
+  MultiFactorInfo,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -13,6 +22,7 @@ import {
   where,
   onSnapshot,
   getDocs,
+  getDoc,
   addDoc,
   updateDoc,
   doc,
@@ -62,7 +72,67 @@ class FirebaseService {
     return auth.currentUser;
   }
 
+  // ========== Security: password + MFA ==========
+  async reauthenticate(password: string): Promise<void> {
+    const user = auth.currentUser;
+    if (!user?.email) throw new Error('Not signed in');
+    const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
+  }
+
+  async changePassword(newPassword: string): Promise<void> {
+    if (!auth.currentUser) throw new Error('Not signed in');
+    await updatePassword(auth.currentUser, newPassword);
+  }
+
+  getEnrolledFactors(): MultiFactorInfo[] {
+    return auth.currentUser ? multiFactor(auth.currentUser).enrolledFactors : [];
+  }
+
+  async startTotpEnrollment(): Promise<TotpSecret> {
+    if (!auth.currentUser) throw new Error('Not signed in');
+    const session = await multiFactor(auth.currentUser).getSession();
+    return TotpMultiFactorGenerator.generateSecret(session);
+  }
+
+  async finishTotpEnrollment(secret: TotpSecret, code: string, displayName: string): Promise<void> {
+    if (!auth.currentUser) throw new Error('Not signed in');
+    const assertion = TotpMultiFactorGenerator.assertionForEnrollment(secret, code);
+    await multiFactor(auth.currentUser).enroll(assertion, displayName);
+  }
+
+  async unenrollFactor(factorUid: string): Promise<void> {
+    if (!auth.currentUser) throw new Error('Not signed in');
+    await multiFactor(auth.currentUser).unenroll(factorUid);
+  }
+
+  // ========== MFA sign-in challenge (used by Login page) ==========
+  isMfaRequiredError(error: any): boolean {
+    return error?.code === 'auth/multi-factor-auth-required';
+  }
+
+  getMfaResolver(error: any): MultiFactorResolver {
+    return getMultiFactorResolver(auth, error);
+  }
+
+  hasTotpHint(resolver: MultiFactorResolver): boolean {
+    return resolver.hints.some(h => h.factorId === TotpMultiFactorGenerator.FACTOR_ID);
+  }
+
+  async resolveTotpSignIn(resolver: MultiFactorResolver, code: string): Promise<FirebaseUser> {
+    const hint = resolver.hints.find(h => h.factorId === TotpMultiFactorGenerator.FACTOR_ID);
+    if (!hint) throw new Error('No authenticator app factor available for this account');
+    const assertion = TotpMultiFactorGenerator.assertionForSignIn(hint.uid, code);
+    const cred = await resolver.resolveSignIn(assertion);
+    return cred.user;
+  }
+
   // ========== Users (Firestore) ==========
+  async getUserById(uid: string): Promise<User | null> {
+    const snap = await getDoc(doc(db, 'users', uid));
+    return snap.exists() ? ({ id: snap.id, ...snap.data() } as User) : null;
+  }
+
   async getUsers(): Promise<User[]> {
     const usersRef = collection(db, 'users');
     const snapshot = await getDocs(usersRef);
@@ -75,9 +145,11 @@ class FirebaseService {
       const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
       callback(users);
     }, (error) => {
+      // Don't blank the list on a transient listener error (e.g. a browser
+      // privacy extension intermittently blocking Firestore's channel) —
+      // keep whatever was last successfully loaded.
       console.error('Error listening to users:', error);
       this._notifyBlocked();
-      callback([]);
     });
   }
 
@@ -104,7 +176,6 @@ class FirebaseService {
     }, (error) => {
       console.error('Error listening to alerts:', error);
       this._notifyBlocked();
-      callback([]);
     });
   }
 
@@ -130,7 +201,6 @@ class FirebaseService {
     }, (error) => {
       console.error('Error listening to team members:', error);
       this._notifyBlocked();
-      callback([]);
     });
   }
 
@@ -156,7 +226,6 @@ class FirebaseService {
     }, (error) => {
       console.error('Error listening to handover logs:', error);
       this._notifyBlocked();
-      callback([]);
     });
   }
 
@@ -170,7 +239,6 @@ class FirebaseService {
     }, (error) => {
       console.error('Error listening to audit logs:', error);
       this._notifyBlocked();
-      callback([]);
     });
   }
 
@@ -180,9 +248,10 @@ class FirebaseService {
     return onSnapshot(ref, (snap) => {
       callback(snap.exists() ? snap.data() : { onStandby: false, tokenResolved: false });
     }, (error) => {
+      // Don't override a valid standby state on a transient listener error —
+      // the initial API fetch in the caller already resolved a starting state.
       console.error('Error listening to standby:', error);
-      // Call callback with empty state so callers don't get stuck waiting
-      callback({ onStandby: false, tokenResolved: false });
+      this._notifyBlocked();
     });
   }
 
@@ -195,7 +264,6 @@ class FirebaseService {
     }, (error) => {
       console.error('Error listening to devices:', error);
       this._notifyBlocked();
-      callback([]);
     });
   }
 }

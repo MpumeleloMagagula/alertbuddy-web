@@ -4,7 +4,8 @@ import { WifiOff, X } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import firebase from '../../services/firebase';
-import { playAlertSound } from '../../utils/soundAlerts';
+import { playAlertSound, isSoundEnabled } from '../../utils/soundAlerts';
+import { showAlertNotification } from '../../utils/browserNotifications';
 
 function PageLoader() {
   return (
@@ -24,7 +25,8 @@ export default function Layout() {
       if (alerts.length > 0) {
         const mostRecentAlert = alerts[0];
         if (mostRecentAlert.timestamp > lastAlertTimeRef.current) {
-          playAlertSound(mostRecentAlert.severity);
+          if (isSoundEnabled()) playAlertSound(mostRecentAlert.severity);
+          showAlertNotification(mostRecentAlert.title, mostRecentAlert.body);
           lastAlertTimeRef.current = mostRecentAlert.timestamp;
         }
       }

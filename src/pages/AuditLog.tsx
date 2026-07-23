@@ -1,29 +1,21 @@
-import { useState, useEffect } from 'react';
-import { 
-  Activity, 
-  Bell, 
-  User, 
-  UserCheck, 
-  Smartphone, 
-  Trash2, 
-  Edit, 
-  Send,
+import { useState, useEffect, useMemo } from 'react';
+import {
+  Activity,
+  Bell,
+  User,
+  UserCheck,
+  Smartphone,
+  Trash2,
+  Edit,
+  FileBarChart,
   Clock,
   Filter,
   Search
 } from 'lucide-react';
 import firebase from '../services/firebase';
 import api from '../services/api';
-
-interface AuditLogEntry {
-  id: string;
-  action: 'ALERT_SENT' | 'STANDBY_UPDATE' | 'USER_CREATED' | 'USER_UPDATED' | 'USER_DELETED' | 'DEVICE_REGISTERED' | 'DEVICE_UNREGISTERED' | 'ALERT_DELETED' | 'ALERT_UPDATED' | 'SETTINGS_CHANGED';
-  performedBy: string;
-  performedByEmail: string;
-  description: string;
-  timestamp: number;
-  metadata?: any;
-}
+import type { AuditLogEntry } from '../types';
+import AuditLogExportModal from '../components/AuditLogExportModal';
 
 export default function AuditLog() {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
@@ -32,14 +24,19 @@ export default function AuditLog() {
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('ALL');
   const [dateRange, setDateRange] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH'>('ALL');
+  const [showExport, setShowExport] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     loadAuditLogs();
-    
+
     // Subscribe to real-time updates
     const unsubscribe = firebase.onAuditLogsChange((updatedLogs) => {
       setLogs(updatedLogs);
-    });
+    }, 500);
 
     return () => unsubscribe?.();
   }, []);
@@ -48,10 +45,14 @@ export default function AuditLog() {
     applyFilters();
   }, [logs, searchQuery, actionFilter, dateRange]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [logs, searchQuery, actionFilter, dateRange]);
+
   const loadAuditLogs = async () => {
     try {
       setIsLoading(true);
-      const fetchedLogs = await api.getAuditLogs();
+      const fetchedLogs = await api.getAuditLogs({ limit: 500 });
       setLogs(fetchedLogs);
     } catch (error) {
       console.error('Failed to load audit logs:', error);
@@ -93,6 +94,28 @@ export default function AuditLog() {
 
     setFilteredLogs(filtered);
   };
+
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, currentPage, pageSize]);
+
+  const pageNumbers = useMemo(() => {
+    const pages: (number | 'ellipsis')[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('ellipsis');
+      for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+        pages.push(i);
+      }
+      if (currentPage < totalPages - 2) pages.push('ellipsis');
+      pages.push(totalPages);
+    }
+    return pages;
+  }, [currentPage, totalPages]);
 
   const getActionIcon = (action: AuditLogEntry['action']) => {
     switch (action) {
@@ -167,36 +190,12 @@ export default function AuditLog() {
     );
   }
 
-  const exportToCSV = () => {
-    if (filteredLogs.length === 0) return;
-
-    const headers = ['ID', 'Action', 'Performed By', 'Email', 'Description', 'Timestamp', 'Metadata'];
-    const csvRows = [
-      headers.join(','),
-      ...filteredLogs.map(log => [
-        log.id,
-        log.action,
-        `"${log.performedBy}"`,
-        log.performedByEmail,
-        `"${log.description}"`,
-        new Date(log.timestamp).toISOString(),
-        `"${JSON.stringify(log.metadata || {}).replace(/"/g, '""')}"`
-      ].join(','))
-    ];
-
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', `audit_logs_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
   return (
     <div className="space-y-6">
+      {showExport && (
+        <AuditLogExportModal logs={logs} onClose={() => setShowExport(false)} />
+      )}
+
       {/* Page header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Audit Log</h1>
@@ -290,7 +289,7 @@ export default function AuditLog() {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredLogs.map((log) => {
+            {paginatedLogs.map((log) => {
               const Icon = getActionIcon(log.action);
               
               return (
@@ -320,46 +319,121 @@ export default function AuditLog() {
                         <div className="flex items-center gap-2 mt-2 text-xs text-gray-600 dark:text-gray-400">
                           <User className="w-3 h-3" />
                           <span>{log.performedBy}</span>
-                          <span>({log.performedByEmail})</span>
+                          {log.performedByEmail && log.performedByEmail !== log.performedBy && (
+                            <span>({log.performedByEmail})</span>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Metadata */}
-                    {log.metadata && (
-                      <div className="mt-3 p-3 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
-                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Additional Details</p>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          {Object.entries(log.metadata).map(([key, value]) => (
-                            <div key={key}>
-                              <span className="text-gray-500 dark:text-gray-400">{key}: </span>
-                              <span className="text-gray-900 dark:text-white font-medium">{String(value)}</span>
-                            </div>
-                          ))}
+                    {/* Metadata — omit null/undefined/empty entries so this doesn't fill up with noise */}
+                    {(() => {
+                      const entries = Object.entries(log.metadata ?? {}).filter(
+                        ([, value]) => value !== null && value !== undefined && value !== ''
+                      );
+                      if (entries.length === 0) return null;
+                      return (
+                        <div className="mt-3 p-3 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Additional Details</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {entries.map(([key, value]) => (
+                              <div key={key}>
+                                <span className="text-gray-500 dark:text-gray-400">{key}: </span>
+                                <span className="text-gray-900 dark:text-white font-medium">{String(value)}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
               );
             })}
           </div>
         )}
+
+        {/* Pagination */}
+        {filteredLogs.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5 pt-4 border-t border-gray-100 dark:border-gray-800">
+            {/* Left: count + page size */}
+            <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+              <span>
+                Showing{' '}
+                <span className="font-semibold text-gray-700 dark:text-gray-300">
+                  {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredLogs.length)}
+                </span>{' '}
+                of{' '}
+                <span className="font-semibold text-gray-700 dark:text-gray-300">{filteredLogs.length}</span>{' '}
+                entries
+              </span>
+              <select
+                value={pageSize}
+                title="Rows per page"
+                onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                className="input py-1 px-2 text-xs w-20"
+              >
+                {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n} / page</option>)}
+              </select>
+            </div>
+
+            {/* Right: page buttons */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-2.5 py-1.5 rounded-lg text-sm font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                ‹ Prev
+              </button>
+
+              {pageNumbers.map((page, i) =>
+                page === 'ellipsis' ? (
+                  <span key={`ellipsis-${pageNumbers[i - 1]}`} className="px-2 text-gray-400 text-sm select-none">…</span>
+                ) : (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                      page === currentPage
+                        ? 'bg-primary-600 text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                )
+              )}
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-2.5 py-1.5 rounded-lg text-sm font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next ›
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Export option */}
       <div className="card">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Export Logs</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Export Report</h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Download audit logs for compliance and record-keeping purposes
+          Generate a visual report with charts, breakdowns, and the full log history for compliance and record-keeping
         </p>
-        <button 
-          onClick={exportToCSV}
-          disabled={filteredLogs.length === 0}
-          className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        <button
+          type="button"
+          onClick={() => setShowExport(true)}
+          disabled={logs.length === 0}
+          className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Send className="w-4 h-4 mr-2" />
-          Export to CSV
+          <FileBarChart className="w-4 h-4" />
+          Export Report
         </button>
       </div>
     </div>

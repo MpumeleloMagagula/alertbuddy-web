@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCheck, Bell, Smartphone, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Users, UserCheck, Bell, Smartphone, ClipboardList, Settings } from 'lucide-react';
 import logo from '../../assets/alert_buddy.png';
 
 
@@ -11,6 +11,7 @@ export default function Sidebar() {
     { to: '/alerts', icon: Bell, label: 'Alerts' },
     { to: '/devices', icon: Smartphone, label: 'Devices' },
     { to: '/audit-log', icon: ClipboardList, label: 'Audit Log' },
+    { to: '/settings', icon: Settings, label: 'Settings' },
   ];
 
   return (

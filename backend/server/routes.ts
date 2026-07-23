@@ -190,11 +190,30 @@ async function sendStandbyNotifications(standby: StandbyInfo, email: string, dis
   }
 
   jobs.push(
-    mailer.sendStandbyAssignedEmail(email, displayName)
-      .then(ok => console.log(`📧 Standby email → ${email}: ${ok ? 'sent' : 'not configured'}`)),
+    emailOnStandbyAssignedEnabled(email).then(enabled => {
+      if (!enabled) {
+        console.log(`📧 Standby email → ${email}: skipped (disabled in notification preferences)`);
+        return;
+      }
+      return mailer.sendStandbyAssignedEmail(email, displayName)
+        .then(ok => console.log(`📧 Standby email → ${email}: ${ok ? 'sent' : 'not configured'}`));
+    }),
   );
 
   await Promise.all(jobs);
+}
+
+// Defaults to true (opt-out) so users who haven't touched notification settings keep getting emailed
+async function emailOnStandbyAssignedEnabled(email: string): Promise<boolean> {
+  if (!admin.apps.length) return true;
+  try {
+    const snap = await admin.firestore().collection('users').where('email', '==', email).limit(1).get();
+    if (snap.empty) return true;
+    const prefs = snap.docs[0].data().notificationPreferences;
+    return prefs?.emailOnStandbyAssigned !== false;
+  } catch {
+    return true;
+  }
 }
 
 // ── Standby Management ────────────────────────────────────────────────────────
@@ -220,7 +239,7 @@ router.post('/standby/update', async (req: Request, res: Response) => {
     performedBy: updatedByEmail ?? displayName,
     performedByEmail: updatedByEmail ?? email,
     description: `Standby assigned to ${displayName}`,
-    metadata: { email, notes: notes ?? null },
+    metadata: notes ? { email, notes } : { email },
   });
 
   res.json({ success: true, standby, tokenResolved: standby.tokenResolved });
@@ -237,7 +256,7 @@ router.delete('/standby', async (req: Request, res: Response) => {
       performedBy: clearedByEmail ?? 'unknown',
       performedByEmail: clearedByEmail ?? 'unknown',
       description: `Standby cleared (was ${previous.displayName ?? previous.email})`,
-      metadata: { previousEmail: previous.email ?? null },
+      metadata: { previousEmail: previous.email },
     });
   }
 
