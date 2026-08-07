@@ -659,8 +659,12 @@ router.post('/grafana/webhook', requireBasicAuth, async (req: Request, res: Resp
         { alertId: alert.alertId, channelId: alert.channelId, channelName: alert.channelName, severity: alert.severity, source: alert.source },
       );
       results.push({ alert: alert.title, sentTo: standby.email, success });
-    } else {
-      const tokens = await getAllFcmTokens();
+    }
+
+    // Broadcast to everyone when there's no standby, or the standby's own push failed
+    // (e.g. a stale token) — better a duplicate notification than a silently dropped alert.
+    if (!standby.onStandby || !standby.fcmToken || !success) {
+      const tokens = (await getAllFcmTokens()).filter(t => t !== standby.fcmToken);
       if (tokens.length > 0) {
         const result = await fcm.sendToMultipleTokens(
           tokens,
