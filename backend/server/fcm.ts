@@ -66,12 +66,14 @@ export async function sendToToken(
   }
 
   try {
+    // Deliberately data-only (no top-level `notification` block): a combined
+    // notification+data payload is auto-displayed by Android when the app is
+    // backgrounded, which skips onMessageReceived() entirely, so the alert
+    // never reaches the app's local database. Data-only messages always
+    // reach onMessageReceived() regardless of app state, and the client
+    // builds/shows its own notification from the data fields.
     const message: admin.messaging.Message = {
       token,
-      notification: {
-        title: notification.title,
-        body: notification.body,
-      },
       data: {
         alertId: data.alertId,
         channelId: data.channelId,
@@ -84,13 +86,6 @@ export async function sendToToken(
       },
       android: {
         priority: 'high',
-        notification: {
-          channelId: data.channelId,
-          priority: 'max' as any,
-          sound: 'default',
-          defaultSound: true,
-          defaultVibrateTimings: true,
-        },
       },
     };
 
@@ -117,12 +112,9 @@ export async function sendToTopic(
   }
 
   try {
+    // Data-only for the same reason as sendToToken() above.
     const message: admin.messaging.Message = {
       topic,
-      notification: {
-        title: notification.title,
-        body: notification.body,
-      },
       data: {
         alertId: data.alertId,
         channelId: data.channelId,
@@ -135,13 +127,6 @@ export async function sendToTopic(
       },
       android: {
         priority: 'high',
-        notification: {
-          channelId: data.channelId,
-          priority: 'max' as any,
-          sound: 'default',
-          defaultSound: true,
-          defaultVibrateTimings: true,
-        },
       },
     };
 
@@ -167,12 +152,9 @@ export async function sendToMultipleTokens(
     return { successCount: 0, failureCount: tokens.length };
   }
 
+  // Data-only for the same reason as sendToToken() above.
   const message: admin.messaging.MulticastMessage = {
     tokens,
-    notification: {
-      title: notification.title,
-      body: notification.body,
-    },
     data: {
       alertId: data.alertId,
       channelId: data.channelId,
@@ -185,13 +167,6 @@ export async function sendToMultipleTokens(
     },
     android: {
       priority: 'high',
-      notification: {
-        channelId: data.channelId,
-        priority: 'max' as any,
-        sound: 'default',
-        defaultSound: true,
-        defaultVibrateTimings: true,
-      },
     },
   };
 
