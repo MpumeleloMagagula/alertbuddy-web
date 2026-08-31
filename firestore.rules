@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// Alert Buddy Firestore security rules.
+//
+// The React portal reads these collections directly with the Firebase client
+// SDK; every WRITE goes through the backend API, which uses the Admin SDK and
+// bypasses these rules. So the model is simple:
+//   • reads  — must be a signed-in user
+//   • writes — denied from the client (backend only), with a narrow exception
+//     for a user editing their own profile fields
+//   • config/** — never exposed to the client (it holds webhook secrets)
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // A user may change only these fields on their own users/{uid} doc.
+    function onlySelfProfileFields() {
+      let allowed = ['displayName', 'department', 'position', 'phoneNumber', 'notificationPreferences'];
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow update: if isSignedIn()
+                    && request.auth.uid == userId
+                    && onlySelfProfileFields();
+      allow create, delete: if false;
+    }
+
+    // Operational data — readable by any signed-in user, written by the backend only.
+    match /alerts/{doc}          { allow read: if isSignedIn(); allow write: if false; }
+    match /devices/{doc}         { allow read: if isSignedIn(); allow write: if false; }
+    match /team_members/{doc}    { allow read: if isSignedIn(); allow write: if false; }
+    match /handover_logs/{doc}   { allow read: if isSignedIn(); allow write: if false; }
+    match /audit_logs/{doc}      { allow read: if isSignedIn(); allow write: if false; }
+    match /alert_templates/{doc} { allow read: if isSignedIn(); allow write: if false; }
+    match /shifts/{doc}          { allow read: if isSignedIn(); allow write: if false; }
+    match /channels/{doc}        { allow read: if isSignedIn(); allow write: if false; }
+    match /standby/{doc}         { allow read: if isSignedIn(); allow write: if false; }
+
+    // Secrets — webhook credentials / tenant token. Client never touches this;
+    // the Integrations UI reads a masked copy through the backend API.
+    match /config/{doc} {
+      allow read, write: if false;
+    }
+
+    // Default deny.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

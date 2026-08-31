@@ -90,7 +90,7 @@ export interface StandbyInfo {
 }
 
 export type AuditLogAction =
-  | 'ALERT_SENT' | 'ALERT_UPDATED' | 'ALERT_DELETED'
+  | 'ALERT_SENT' | 'ALERT_UPDATED' | 'ALERT_DELETED' | 'WEBHOOK_ALERT'
   | 'STANDBY_UPDATE'
   | 'USER_CREATED' | 'USER_UPDATED' | 'USER_DELETED'
   | 'DEVICE_REGISTERED' | 'DEVICE_UNREGISTERED'
@@ -181,4 +181,21 @@ export interface TestAlertFormData {
   severity: Severity;
   channelId: string;
   channelName: string;
+}
+
+// Integrations config
+export interface Channel {
+  id: string;
+  name: string;
+  matchKeys: string[];
+}
+
+export interface WebhookConfigView {
+  basicUser: string;
+  basicPasswordSet: boolean;
+  basicPasswordMasked: string;
+  bearerTokenSet: boolean;
+  bearerTokenMasked: string;
+  tenantTokenSet: boolean;
+  tenantToken: string;
 }

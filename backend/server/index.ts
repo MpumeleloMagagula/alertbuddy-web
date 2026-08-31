@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import * as fcm from './fcm.js';
 import routes from './routes.js';
 import enhancedRoutes from './enhanced-features.js';
+import webhookRoutes from './webhook-routes.js';
+import configRoutes from './config-routes.js';
 
 // Load environment variables
 dotenv.config();
@@ -25,8 +27,11 @@ app.use((req, _res, next) => {
 fcm.initializeFirebase();
 
 // Mount API routes
+// Webhooks first — they carry their own credential and must not hit requireAuth.
+app.use('/api', webhookRoutes);
 app.use('/api', routes);
 app.use('/api', enhancedRoutes);
+app.use('/api', configRoutes);
 
 // Root endpoint
 app.get('/', (_req, res) => {
@@ -47,7 +52,8 @@ app.get('/', (_req, res) => {
       sendAlert: 'POST /api/alerts/send',
       sendStandbyAlert: 'POST /api/alerts/send-standby',
       sendTopicAlert: 'POST /api/alerts/send-topic',
-      grafanaWebhook: 'POST /api/grafana/webhook',
+      grafanaWebhook: 'POST /api/webhooks/grafana',
+      zabbixWebhook: 'POST /api/webhooks/zabbix',
     },
   });
 });
@@ -82,7 +88,8 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     console.log('');
     console.log('📡 API Endpoints:');
     console.log(`   GET  http://localhost:${PORT}/api/status`);
-    console.log(`   POST http://localhost:${PORT}/api/grafana/webhook`);
+    console.log(`   POST http://localhost:${PORT}/api/webhooks/grafana`);
+    console.log(`   POST http://localhost:${PORT}/api/webhooks/zabbix`);
     console.log(`   POST http://localhost:${PORT}/api/alerts/send`);
     console.log('');
     console.log('Press Ctrl+C to stop the server');

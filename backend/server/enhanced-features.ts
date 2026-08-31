@@ -1,7 +1,12 @@
 import express from 'express';
 import admin from 'firebase-admin';
+import { requireAuth, requireRole, invalidateRoleCache } from './auth.js';
+import { withTenant } from './tenant.js';
 
 const router = express.Router();
+
+// Every route here needs a signed-in user; mutations additionally need a role.
+router.use(requireAuth);
 
 // Lazy getter for Firestore to avoid initialization order issues
 const getDb = () => admin.firestore();
@@ -58,10 +63,10 @@ async function logAuditAction(data: {
   metadata?: any;
 }) {
   try {
-    await getDb().collection('audit_logs').add({
+    await getDb().collection('audit_logs').add(withTenant({
       ...data,
       timestamp: Date.now(),
-    });
+    }));
   } catch (error) {
     console.error('Error logging audit action:', error);
   }
@@ -167,18 +172,18 @@ router.get('/users', async (_req, res) => {
 /**
  * Create a new user
  */
-router.post('/users', async (req, res) => {
+router.post('/users', requireRole('ADMIN'), async (req, res) => {
   try {
-    const userData = req.body;
-    const userRef = await getDb().collection('users').add({
+    const { adminId, adminEmail, ...userData } = req.body;
+    const userRef = await getDb().collection('users').add(withTenant({
       ...userData,
       createdAt: Date.now(),
-    });
+    }));
 
     await logAuditAction({
       action: 'USER_CREATED',
-      performedBy: req.body.adminId || 'admin',
-      performedByEmail: req.body.adminEmail || 'admin@alertbuddy.com',
+      performedBy: req.authUser!.email,
+      performedByEmail: req.authUser!.email,
       description: `Created user: ${userData.email}`,
       metadata: { userId: userRef.id, email: userData.email },
     });
@@ -193,20 +198,36 @@ router.post('/users', async (req, res) => {
 /**
  * Update a user
  */
+// Fields a user is allowed to change on their OWN record
+const SELF_EDITABLE_USER_FIELDS = ['displayName', 'department', 'position', 'phoneNumber', 'notificationPreferences'];
+
 router.put('/users/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { adminId, adminEmail, ...userData } = req.body;
+    const caller = req.authUser!;
+    const isSelf = caller.uid === userId;
+    const isAdmin = caller.role === 'ADMIN';
+
+    if (!isSelf && !isAdmin) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+    }
+
+    const { adminId, adminEmail, ...incoming } = req.body;
+    // A non-admin editing themselves may only touch profile/preference fields.
+    const userData = isAdmin
+      ? incoming
+      : Object.fromEntries(Object.entries(incoming).filter(([k]) => SELF_EDITABLE_USER_FIELDS.includes(k)));
 
     // set+merge (not update) so this also works as an upsert for a user's
     // own profile/notification-preference edits, even if their Firestore
     // doc doesn't exist yet
-    await getDb().collection('users').doc(userId).set(userData, { merge: true });
+    await getDb().collection('users').doc(userId).set(withTenant(userData), { merge: true });
+    if (isAdmin && 'role' in incoming) invalidateRoleCache(userId);
 
     await logAuditAction({
       action: 'USER_UPDATED',
-      performedBy: adminEmail || adminId || 'unknown',
-      performedByEmail: adminEmail || 'unknown',
+      performedBy: caller.email,
+      performedByEmail: caller.email,
       description: `Updated user: ${userId}`,
       metadata: { userId, updates: Object.keys(userData) },
     });
@@ -221,16 +242,17 @@ router.put('/users/:userId', async (req, res) => {
 /**
  * Delete a user
  */
-router.delete('/users/:userId', async (req, res) => {
+router.delete('/users/:userId', requireRole('ADMIN'), async (req, res) => {
   try {
     const { userId } = req.params;
 
     await getDb().collection('users').doc(userId).delete();
+    invalidateRoleCache(userId);
 
     await logAuditAction({
       action: 'USER_DELETED',
-      performedBy: req.query.adminId as string || 'admin',
-      performedByEmail: req.query.adminEmail as string || 'admin@alertbuddy.com',
+      performedBy: req.authUser!.email,
+      performedByEmail: req.authUser!.email,
       description: `Deleted user: ${userId}`,
       metadata: { userId },
     });
@@ -263,17 +285,17 @@ router.get('/team', async (_req, res) => {
 /**
  * Update team member
  */
-router.put('/team/:memberId', async (req, res) => {
+router.put('/team/:memberId', requireRole('ADMIN'), async (req, res) => {
   try {
     const { memberId } = req.params;
-    const memberData = req.body;
+    const { adminId, adminEmail, ...memberData } = req.body;
 
     await getDb().collection('team_members').doc(memberId).update(memberData);
 
     await logAuditAction({
       action: 'STANDBY_UPDATED',
-      performedBy: req.body.adminId || 'admin',
-      performedByEmail: req.body.adminEmail || 'admin@alertbuddy.com',
+      performedBy: req.authUser!.email,
+      performedByEmail: req.authUser!.email,
       description: `Updated team member: ${memberId}`,
       metadata: { memberId },
     });
@@ -306,18 +328,18 @@ router.get('/shifts', async (_req, res) => {
 /**
  * Create a shift
  */
-router.post('/shifts', async (req, res) => {
+router.post('/shifts', requireRole('ADMIN'), async (req, res) => {
   try {
-    const shiftData = req.body;
-    const shiftRef = await getDb().collection('shifts').add({
+    const { adminId, adminEmail, ...shiftData } = req.body;
+    const shiftRef = await getDb().collection('shifts').add(withTenant({
       ...shiftData,
       createdAt: Date.now(),
-    });
+    }));
 
     await logAuditAction({
       action: 'SETTINGS_CHANGED',
-      performedBy: req.body.adminId || 'admin',
-      performedByEmail: req.body.adminEmail || 'admin@alertbuddy.com',
+      performedBy: req.authUser!.email,
+      performedByEmail: req.authUser!.email,
       description: `Created shift: ${shiftData.name}`,
       metadata: { shiftId: shiftRef.id, name: shiftData.name },
     });
@@ -332,7 +354,7 @@ router.post('/shifts', async (req, res) => {
 /**
  * Delete a shift
  */
-router.delete('/shifts/:shiftId', async (req, res) => {
+router.delete('/shifts/:shiftId', requireRole('ADMIN'), async (req, res) => {
   try {
     const { shiftId } = req.params;
 
@@ -340,8 +362,8 @@ router.delete('/shifts/:shiftId', async (req, res) => {
 
     await logAuditAction({
       action: 'SETTINGS_CHANGED',
-      performedBy: req.query.adminId as string || 'admin',
-      performedByEmail: req.query.adminEmail as string || 'admin@alertbuddy.com',
+      performedBy: req.authUser!.email,
+      performedByEmail: req.authUser!.email,
       description: `Deleted shift: ${shiftId}`,
       metadata: { shiftId },
     });
@@ -356,7 +378,7 @@ router.delete('/shifts/:shiftId', async (req, res) => {
 /**
  * Activate/Deactivate a shift
  */
-router.post('/shifts/:shiftId/activate', async (req, res) => {
+router.post('/shifts/:shiftId/activate', requireRole('ADMIN'), async (req, res) => {
   try {
     const { shiftId } = req.params;
     const { isActive } = req.body;
@@ -365,8 +387,8 @@ router.post('/shifts/:shiftId/activate', async (req, res) => {
 
     await logAuditAction({
       action: 'SETTINGS_CHANGED',
-      performedBy: req.body.adminId || 'admin',
-      performedByEmail: req.body.adminEmail || 'admin@alertbuddy.com',
+      performedBy: req.authUser!.email,
+      performedByEmail: req.authUser!.email,
       description: `${isActive ? 'Activated' : 'Deactivated'} shift: ${shiftId}`,
       metadata: { shiftId, isActive },
     });

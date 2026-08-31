@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 import dotenv from 'dotenv';
+import { withTenant } from './tenant.js';
 
 // Load environment variables
 dotenv.config();
@@ -30,7 +31,7 @@ async function setupFirestore() {
     try {
         // 1. Create users collection
         console.log('📝 Creating users collection...');
-        await db.collection('users').add({
+        await db.collection('users').add(withTenant({
             email: 'mpumelelo.magagula@altron.com',
             displayName: 'Mpumelelo Magagula',
             role: 'ADMIN',
@@ -39,12 +40,12 @@ async function setupFirestore() {
             phoneNumber: '',
             isActive: true,
             createdAt: Date.now(),
-        });
+        }));
         console.log('✅ Users collection created\n');
 
         // 2. Create team_members collection
         console.log('📝 Creating team_members collection...');
-        await db.collection('team_members').add({
+        await db.collection('team_members').add(withTenant({
             email: 'mpumelelo.magagula@altron.com',
             displayName: 'Mpumelelo Magagula',
             role: 'ADMIN',
@@ -52,12 +53,12 @@ async function setupFirestore() {
             phoneNumber: '',
             createdAt: Date.now(),
             isCurrentUser: false,
-        });
+        }));
         console.log('✅ Team members collection created\n');
 
         // 3. Create alerts collection with sample alert
         console.log('📝 Creating alerts collection...');
-        await db.collection('alerts').add({
+        await db.collection('alerts').add(withTenant({
             title: 'Welcome to Alert Buddy',
             body: 'System is ready for critical infrastructure alerting. All components operational.',
             severity: 'INFO',
@@ -66,12 +67,12 @@ async function setupFirestore() {
             timestamp: Date.now(),
             isRead: false,
             source: 'System',
-        });
+        }));
         console.log('✅ Alerts collection created\n');
 
         // 4. Create handover_logs collection
         console.log('📝 Creating handover_logs collection...');
-        await db.collection('handover_logs').add({
+        await db.collection('handover_logs').add(withTenant({
             fromUserId: 'system',
             fromUserName: 'System',
             toUserId: 'mpumelelo.magagula@altron.com',
@@ -79,7 +80,7 @@ async function setupFirestore() {
             handoverAt: Date.now(),
             notes: 'Initial system setup - First administrator assigned',
             pendingAlertsCount: 0,
-        });
+        }));
         console.log('✅ Handover logs collection created\n');
 
         console.log('🎉 Firestore setup complete!');

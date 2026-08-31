@@ -1,10 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect, useState, lazy } from 'react';
+import { lazy } from 'react';
 import { Toaster } from 'sonner';
-import firebase from './services/firebase';
 
 // Contexts
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Layout
 import Layout from './components/layout/Layout';
@@ -19,20 +19,10 @@ const AuditLog  = lazy(() => import('./pages/AuditLog'));
 const Settings  = lazy(() => import('./pages/Settings'));
 import Login from './pages/Login';
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+function AppRoutes() {
+  const { loading, isAuthenticated, isAdmin } = useAuth();
 
-  useEffect(() => {
-    const unsubscribe = firebase.onAuthChange((user) => {
-      setIsAuthenticated(!!user);
-      setIsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 transition-colors">
         <div className="text-center">
@@ -44,31 +34,39 @@ function App() {
   }
 
   return (
-    <ThemeProvider>
-      <BrowserRouter>
-        <Toaster position="top-right" richColors />
-        <Routes>
-          <Route
-            path="/login"
-            element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
-          />
-          
-          <Route
-            path="/"
-            element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}
-          >
-            <Route index element={<Dashboard />} />
-            <Route path="users" element={<Users />} />
-            <Route path="standby" element={<Standby />} />
-            <Route path="alerts" element={<Alerts />} />
-            <Route path="devices" element={<Devices />} />
-            <Route path="audit-log" element={<AuditLog />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
+    <BrowserRouter>
+      <Toaster position="top-right" richColors />
+      <Routes>
+        <Route
+          path="/login"
+          element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+        />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+        <Route
+          path="/"
+          element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="users" element={isAdmin ? <Users /> : <Navigate to="/" replace />} />
+          <Route path="standby" element={<Standby />} />
+          <Route path="alerts" element={<Alerts />} />
+          <Route path="devices" element={<Devices />} />
+          <Route path="audit-log" element={<AuditLog />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
     </ThemeProvider>
   );
 }

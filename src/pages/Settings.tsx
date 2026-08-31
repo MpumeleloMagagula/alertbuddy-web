@@ -1,12 +1,14 @@
 import { useState, useEffect, FormEvent } from 'react';
 import {
   User as UserIcon, Shield, Bell, Palette, KeyRound, Monitor,
-  Sun, Moon, Check, Loader2, Trash2, Volume2, Mail, ShieldCheck, Copy,
+  Sun, Moon, Check, Loader2, Trash2, Volume2, Mail, ShieldCheck, Copy, Webhook, Plus, RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import firebase from '../services/firebase';
 import api from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { useTheme, type ThemeMode } from '../contexts/ThemeContext';
+import type { Channel, WebhookConfigView } from '../types';
 import { isSoundEnabled, toggleSound } from '../utils/soundAlerts';
 import {
   getBrowserNotificationPermission,
@@ -17,18 +19,21 @@ import {
 import type { User, NotificationPreferences } from '../types';
 import type { MultiFactorInfo, TotpSecret } from 'firebase/auth';
 
-type Tab = 'profile' | 'security' | 'notifications' | 'appearance';
+type Tab = 'profile' | 'security' | 'notifications' | 'appearance' | 'integrations';
 
-const TABS: { id: Tab; label: string; icon: typeof UserIcon }[] = [
+const TABS: { id: Tab; label: string; icon: typeof UserIcon; adminOnly?: boolean }[] = [
   { id: 'profile',       label: 'Profile',       icon: UserIcon },
   { id: 'security',      label: 'Security',      icon: Shield },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'appearance',    label: 'Appearance',     icon: Palette },
+  { id: 'integrations',  label: 'Integrations',  icon: Webhook, adminOnly: true },
 ];
 
 export default function Settings() {
+  const { isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('profile');
   const currentUser = firebase.getCurrentUser();
+  const tabs = TABS.filter(t => !t.adminOnly || isAdmin);
   const [profile, setProfile] = useState<User | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
@@ -51,7 +56,7 @@ export default function Settings() {
         {/* Tab list */}
         <nav className="md:w-56 flex-shrink-0">
           <ul className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible">
-            {TABS.map(tab => (
+            {tabs.map(tab => (
               <li key={tab.id} className="flex-shrink-0">
                 <button
                   type="button"
@@ -80,6 +85,7 @@ export default function Settings() {
             <NotificationsTab profile={profile} onSaved={setProfile} />
           )}
           {activeTab === 'appearance' && <AppearanceTab />}
+          {activeTab === 'integrations' && isAdmin && <IntegrationsTab />}
         </div>
       </div>
     </div>
@@ -585,6 +591,222 @@ function AppearanceTab() {
             </span>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Integrations (ADMIN) — monitoring webhook credentials + channel map
+// ══════════════════════════════════════════════════════════════════════════
+
+function IntegrationsTab() {
+  const [webhook, setWebhook] = useState<WebhookConfigView | null>(null);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || window.location.origin;
+
+  const load = () => {
+    setLoading(true);
+    Promise.all([api.getWebhookConfig(), api.getChannels()])
+      .then(([w, c]) => { setWebhook(w); setChannels(c); })
+      .catch(() => toast.error('Failed to load integration settings'))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  if (loading) {
+    return <div className="card flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary-600" /></div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <WebhookCard webhook={webhook} apiBase={apiBase} onChange={setWebhook} />
+      <ChannelsCard channels={channels} onChange={setChannels} />
+    </div>
+  );
+}
+
+function CopyRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</p>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 text-xs bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg break-all">{value}</code>
+        <button
+          type="button"
+          onClick={() => { navigator.clipboard.writeText(value); toast.success('Copied'); }}
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" title="Copy"
+        >
+          <Copy className="w-4 h-4 text-gray-500" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WebhookCard({ webhook, apiBase, onChange }: {
+  webhook: WebhookConfigView | null;
+  apiBase: string;
+  onChange: (w: WebhookConfigView) => void;
+}) {
+  const [basicUser, setBasicUser] = useState(webhook?.basicUser ?? '');
+  const [basicPassword, setBasicPassword] = useState('');
+  const [bearerToken, setBearerToken] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const save = async (extra?: { regenerateTenantToken?: boolean }) => {
+    try {
+      setSaving(true);
+      const next = await api.updateWebhookConfig({
+        basicUser: basicUser.trim(),
+        ...(basicPassword ? { basicPassword } : {}),
+        ...(bearerToken ? { bearerToken } : {}),
+        ...extra,
+      });
+      onChange(next);
+      setBasicPassword(''); setBearerToken('');
+      toast.success('Webhook settings saved');
+    } catch {
+      toast.error('Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const tokenUrl = webhook?.tenantToken
+    ? `${apiBase}/api/webhooks/zabbix/${webhook.tenantToken}`
+    : `${apiBase}/api/webhooks/zabbix/<generate a token below>`;
+
+  return (
+    <div className="card space-y-5">
+      <div>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+          <Webhook className="w-5 h-5 text-gray-500" /> Monitoring Webhooks
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Point Grafana / Zabbix at these URLs. One credential set guards them all.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <CopyRow label="Grafana webhook URL" value={`${apiBase}/api/webhooks/grafana`} />
+        <CopyRow label="Zabbix webhook URL" value={`${apiBase}/api/webhooks/zabbix`} />
+        <CopyRow label="Zabbix URL with path token (no Authorization header needed)" value={tokenUrl} />
+      </div>
+
+      <div className="border-t border-gray-100 dark:border-gray-800 pt-5 space-y-4 max-w-md">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Basic auth username</label>
+          <input value={basicUser} onChange={e => setBasicUser(e.target.value)} className="input w-full" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Basic auth password {webhook?.basicPasswordSet && <span className="text-xs text-gray-400">(set: {webhook.basicPasswordMasked} — leave blank to keep)</span>}
+          </label>
+          <input type="password" value={basicPassword} onChange={e => setBasicPassword(e.target.value)} className="input w-full" placeholder="••••••••" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Bearer token {webhook?.bearerTokenSet && <span className="text-xs text-gray-400">(set: {webhook.bearerTokenMasked} — leave blank to keep)</span>}
+          </label>
+          <input type="password" value={bearerToken} onChange={e => setBearerToken(e.target.value)} className="input w-full" placeholder="optional" />
+        </div>
+        <div className="flex gap-2">
+          <button type="button" disabled={saving} onClick={() => save()} className="btn-primary flex items-center gap-2 disabled:opacity-50">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save
+          </button>
+          <button type="button" disabled={saving} onClick={() => save({ regenerateTenantToken: true })} className="btn-secondary flex items-center gap-2 disabled:opacity-50">
+            <RefreshCw className="w-4 h-4" /> Regenerate path token
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChannelsCard({ channels, onChange }: {
+  channels: Channel[];
+  onChange: (c: Channel[]) => void;
+}) {
+  const [draft, setDraft] = useState({ id: '', name: '', matchKeys: '' });
+  const [busy, setBusy] = useState(false);
+
+  const add = async () => {
+    if (!draft.id.trim() || !draft.name.trim()) { toast.error('id and name are required'); return; }
+    try {
+      setBusy(true);
+      const res = await api.saveChannel({
+        id: draft.id.trim().toLowerCase(),
+        name: draft.name.trim(),
+        matchKeys: draft.matchKeys.split(',').map(k => k.trim()).filter(Boolean),
+      });
+      if (res.success === false) throw new Error();
+      onChange(await api.getChannels());
+      setDraft({ id: '', name: '', matchKeys: '' });
+      toast.success('Channel saved');
+    } catch {
+      toast.error('Failed to save channel');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    try {
+      await api.deleteChannel(id);
+      onChange(channels.filter(c => c.id !== id));
+      toast.success('Channel removed');
+    } catch {
+      toast.error('Failed to remove channel');
+    }
+  };
+
+  return (
+    <div className="card space-y-4">
+      <div>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Channel Routing</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Incoming alerts are routed to a channel by matching a Grafana folder / Zabbix tag or host group
+          against these keys. Unmatched alerts go to the default channel.
+        </p>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
+              <th className="py-2 pr-4">Channel ID</th>
+              <th className="py-2 pr-4">Display name</th>
+              <th className="py-2 pr-4">Match keys</th>
+              <th className="py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {channels.map(c => (
+              <tr key={c.id} className="border-b border-gray-50 dark:border-gray-800/50">
+                <td className="py-2 pr-4 font-mono text-xs">{c.id}</td>
+                <td className="py-2 pr-4">{c.name}</td>
+                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400">{c.matchKeys.join(', ')}</td>
+                <td className="py-2 text-right">
+                  <button type="button" onClick={() => remove(c.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end border-t border-gray-100 dark:border-gray-800 pt-4">
+        <input value={draft.id} onChange={e => setDraft(d => ({ ...d, id: e.target.value }))} className="input text-sm" placeholder="channel-id" />
+        <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} className="input text-sm" placeholder="Display name" />
+        <input value={draft.matchKeys} onChange={e => setDraft(d => ({ ...d, matchKeys: e.target.value }))} className="input text-sm" placeholder="key1, key2" />
+        <button type="button" disabled={busy} onClick={add} className="btn-primary flex items-center justify-center gap-1.5 text-sm disabled:opacity-50">
+          <Plus className="w-4 h-4" /> Add / update
+        </button>
       </div>
     </div>
   );

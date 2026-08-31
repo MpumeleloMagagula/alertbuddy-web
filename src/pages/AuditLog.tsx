@@ -120,6 +120,7 @@ export default function AuditLog() {
   const getActionIcon = (action: AuditLogEntry['action']) => {
     switch (action) {
       case 'ALERT_SENT':
+      case 'WEBHOOK_ALERT':
         return Bell;
       case 'STANDBY_UPDATE':
         return UserCheck;
@@ -145,6 +146,7 @@ export default function AuditLog() {
   const getActionColor = (action: AuditLogEntry['action']) => {
     switch (action) {
       case 'ALERT_SENT':
+      case 'WEBHOOK_ALERT':
         return 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300';
       case 'STANDBY_UPDATE':
         return 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300';
@@ -240,6 +242,7 @@ export default function AuditLog() {
             >
               <option value="ALL">All Actions</option>
               <option value="ALERT_SENT">Alert Sent</option>
+              <option value="WEBHOOK_ALERT">Webhook Alert</option>
               <option value="ALERT_UPDATED">Alert Updated</option>
               <option value="ALERT_DELETED">Alert Deleted</option>
               <option value="STANDBY_UPDATE">Standby Update</option>
