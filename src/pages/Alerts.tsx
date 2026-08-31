@@ -24,8 +24,10 @@ import api from '../services/api';
 import firebase from '../services/firebase';
 import type { Alert, TestAlertFormData, Severity, StandbyInfo } from '../types';
 import AlertExportModal from '../components/AlertExportModal';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Alerts() {
+  const { isManager } = useAuth();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [filteredAlerts, setFilteredAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,18 +65,19 @@ export default function Alerts() {
     channelName: 'Core Services Monitoring',
   });
 
-  const channels = [
+  const [channels, setChannels] = useState<{ id: string; name: string }[]>([
     { id: 'core-monitoring', name: 'Core Services Monitoring' },
     { id: 'infra-alerts', name: 'Cloud Infrastructure Alerts' },
     { id: 'api-gateway', name: 'External API Gateway' },
     { id: 'db-health', name: 'Database Health Cluster' },
     { id: 'crisis-response', name: 'Urgent Crisis Response' },
-  ];
+  ]);
 
   useEffect(() => {
     // API call on mount so alerts load even when Firestore listener is blocked
     api.getAlerts(100).then(a => { setAlerts(a); setIsLoading(false); }).catch(() => setIsLoading(false));
     api.getAlertTemplates().then(t => setTemplates(t)).catch(() => {});
+    api.getChannels().then(c => { if (c.length) setChannels(c); }).catch(() => {});
 
     const timeout = setTimeout(() => setIsLoading(false), 5000);
 
@@ -310,33 +313,43 @@ export default function Alerts() {
     }
   };
 
-  const handleTestGrafanaWebhook = async () => {
-    const grafanaPayload = {
-      receiver: "alert-buddy",
-      status: "firing",
-      alerts: [
-        {
-          status: "firing",
+  const buildTestPayload = (source: 'grafana' | 'zabbix') => {
+    if (source === 'grafana') {
+      return {
+        receiver: 'alert-buddy',
+        status: 'firing',
+        alerts: [{
+          status: 'firing',
           labels: {
-            alertname: "High CPU Usage",
-            severity: "critical",
-            instance: "prod-server-01",
+            alertname: testAlert.title || 'High CPU Usage',
+            severity: (testAlert.severity || 'critical').toLowerCase(),
+            instance: 'prod-server-01',
             grafana_folder: testAlert.channelId,
           },
-          annotations: {
-            summary: testAlert.title,
-            description: testAlert.message,
-          },
-        },
-      ],
+          annotations: { summary: testAlert.title, description: testAlert.message },
+        }],
+      };
+    }
+    // zabbix
+    return {
+      alertId: `test-${Date.now()}`,
+      eventValue: '1',
+      severity: testAlert.severity === 'CRITICAL' ? 'Disaster'
+        : testAlert.severity === 'WARNING' ? 'Warning' : 'Information',
+      name: testAlert.title || 'High CPU load',
+      host: 'prod-server-01',
+      opdata: testAlert.message,
+      tags: JSON.stringify([{ tag: 'channel', value: testAlert.channelId }]),
     };
+  };
 
+  const handleTestWebhook = async (source: 'grafana' | 'zabbix') => {
     try {
       setIsSending(true);
-      await api.sendGrafanaWebhook(grafanaPayload);
-      toast.success('Grafana webhook test successful');
+      await api.testWebhook(source, buildTestPayload(source));
+      toast.success(`${source === 'grafana' ? 'Grafana' : 'Zabbix'} webhook test successful`);
     } catch (error) {
-      toast.error('Failed to test Grafana webhook');
+      toast.error(`Failed to test ${source} webhook`);
     } finally {
       setIsSending(false);
     }
@@ -385,7 +398,8 @@ export default function Alerts() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Form and Stats */}
         <div className="lg:col-span-1 space-y-6">
-          {/* Send Test Alert */}
+          {/* Send Alert — managers & admins only */}
+          {isManager && (
           <div className="card">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Send Alert</h2>
@@ -515,9 +529,14 @@ export default function Alerts() {
                   <UserCheck className="w-4 h-4" />
                   {isSending ? 'Sending...' : 'Send to Standby'}
                 </button>
-                <button type="button" onClick={handleTestGrafanaWebhook} disabled={isSending} className="btn-secondary w-full flex items-center justify-center gap-2">
-                  <TestTube className="w-4 h-4" /> Test Webhook
-                </button>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => handleTestWebhook('grafana')} disabled={isSending} className="btn-secondary flex-1 flex items-center justify-center gap-2">
+                    <TestTube className="w-4 h-4" /> Test Grafana
+                  </button>
+                  <button type="button" onClick={() => handleTestWebhook('zabbix')} disabled={isSending} className="btn-secondary flex-1 flex items-center justify-center gap-2">
+                    <TestTube className="w-4 h-4" /> Test Zabbix
+                  </button>
+                </div>
               </div>
 
               {/* Save as template */}
@@ -568,6 +587,7 @@ export default function Alerts() {
               </div>
             </div>
           </div>
+          )}
 
           {/* Alert Stats */}
           <div className="grid grid-cols-2 gap-4">

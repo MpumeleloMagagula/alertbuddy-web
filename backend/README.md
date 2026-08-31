@@ -7,8 +7,9 @@ Express.js backend server for Alert Buddy system with Firebase Cloud Messaging a
 - ✅ Firebase Cloud Messaging (FCM) for push notifications
 - ✅ Device token management
 - ✅ Standby/on-call rotation management
-- ✅ Grafana Unified Alerting webhook receiver
-- ✅ Alert broadcasting and routing
+- ✅ Monitoring webhook gateway — Grafana Unified Alerting + Zabbix
+- ✅ Alert broadcasting and routing (standby → broadcast fallback)
+- ✅ Auto-resolve alerts on recovery events
 - ✅ Handover logging
 - ✅ RESTful API
 
@@ -58,6 +59,75 @@ npm start
 ```
 
 Server runs on: **http://localhost:5000**
+
+## Authentication & tenancy
+
+Every `/api` route requires a **Firebase ID token** except `GET /api/status`
+(health) and `POST /api/webhooks/*` (their own credential):
+
+```
+Authorization: Bearer <firebase id token>
+```
+
+The portal and mobile app get this from the Firebase Auth SDK
+(`user.getIdToken()`). The backend verifies it and resolves the caller's role
+from the `users` collection:
+
+| Role | Can additionally… |
+|------|-------------------|
+| `USER` | acknowledge alerts, register own device, edit own profile |
+| `MANAGER` | assign standby, send/broadcast alerts, bulk alert ops, run webhook tests |
+| `ADMIN` | manage users, integrations config, templates, shifts, delete devices |
+
+`GET /api/me` returns `{ uid, email, role, tenantId }` for the signed-in user.
+
+**Tenancy** — one deployment serves one client. `TENANT_ID` (env) is stamped onto
+every Firestore write. There is no cross-tenant read filtering (unnecessary when
+one Firebase project == one client).
+
+**Runtime config** — webhook credentials and the channel map live in Firestore
+(`config/webhook`, `channels`), editable from **Settings → Integrations**. Env
+vars (`WEBHOOK_USER` …) are bootstrap fallbacks used until the doc exists.
+
+**Firestore rules** — `firestore.rules` (repo root) locks direct client access to
+"signed-in, read-only"; all writes go through this API. Deploy with
+`firebase deploy --only firestore`.
+
+## Rollout / testing checklist
+
+The auth changes are **active as soon as this backend deploys**, independent of
+the Firestore rules. When testing:
+
+1. **Firestore rules are opt-in.** `firestore.rules` / `firestore.indexes.json`
+   just sit in the repo until you run `firebase deploy --only firestore`
+   (same Firebase project as the app — Vercel can't push rules). Skipping this
+   for now is fine; the browser keeps reading Firestore under whatever rules the
+   console currently has. Tighten before going to production
+   (Console → Firestore → Rules).
+
+2. **Portal works as-is.** `src/services/api.ts` attaches the Firebase ID token
+   automatically. But make sure your test account has a `users/{uid}` document
+   with `role: "ADMIN"` (or `"MANAGER"`) — without it the user is treated as a
+   plain `USER` and won't see the Send Alert card, the Users page, or the
+   Integrations tab. The invite flow writes `users/{uid}`; users created by the
+   seed script or the old `POST /api/users` have random doc ids, so set the role
+   on the uid-keyed doc.
+
+3. **Mobile app needs a token.** `/api/devices/register`, `/ping`, `/health`
+   now return **401** until the Android app sends
+   `Authorization: Bearer <FirebaseAuth.currentUser.getIdToken()>`. Update and
+   release the app in lockstep. Until then, test alert delivery with the
+   portal's **Send to All / Send to Standby** buttons instead of a real device
+   round-trip. (A temporary "warn but allow" shim on the device routes can bridge
+   this if needed.)
+
+4. **Webhooks are unaffected.** Grafana/Zabbix keep working with the existing
+   `GRAFANA_WEBHOOK_USER` / `GRAFANA_WEBHOOK_PASSWORD` env vars (honoured as a
+   fallback) until you set credentials in Settings → Integrations.
+
+5. **Per client deployment:** set `TENANT_ID` (e.g. `vsa`, `acme`), point the
+   build at that client's Firebase project + backend URL, `firebase deploy
+   --only firestore` for that project.
 
 ## API Endpoints
 
@@ -189,15 +259,28 @@ Content-Type: application/json
 }
 ```
 
-### Grafana Webhook
+### Monitoring Webhooks (gateway)
 
-Requires HTTP Basic Auth. Set `GRAFANA_WEBHOOK_USER` / `GRAFANA_WEBHOOK_PASSWORD` in the
-server environment and configure the same credentials as Basic Auth on the Grafana
-contact point — requests without them are rejected with `401`, and the endpoint
-returns `500` if the server-side env vars aren't set at all.
+Alert Buddy is the single ingress for every monitoring system. Each source has a
+thin parser; the shared `dispatchAlerts()` pipeline handles standby routing,
+broadcast fallback, Firestore history and auto-resolve on recovery.
+
+| Route | Source |
+|-------|--------|
+| `POST /api/webhooks/grafana` | Grafana Unified Alerting |
+| `POST /api/webhooks/zabbix`  | Zabbix (see [docs/zabbix-integration.md](docs/zabbix-integration.md)) |
+| `POST /api/grafana/webhook`  | back-compat alias for `/webhooks/grafana` |
+| `POST /api/webhooks/:source/:tenantToken` | path-token variant (no auth header) |
+
+**Auth** — one credential set guards all of them (Basic, Bearer, or a path
+token). Managed from **Settings → Integrations**; until that doc exists the
+server falls back to env (`WEBHOOK_USER` / `WEBHOOK_PASSWORD` / `WEBHOOK_TOKEN` /
+`WEBHOOK_TENANT_TOKEN`, plus legacy `GRAFANA_WEBHOOK_USER` /
+`GRAFANA_WEBHOOK_PASSWORD`). A request is rejected `500` if nothing is
+configured, `401` on bad creds.
 
 ```bash
-POST /api/grafana/webhook
+POST /api/webhooks/grafana
 Authorization: Basic base64(user:password)
 Content-Type: application/json
 
@@ -271,8 +354,8 @@ curl -X POST http://localhost:5000/api/alerts/send \
 ### Test Grafana Webhook
 
 ```bash
-curl -X POST http://localhost:5000/api/grafana/webhook \
-  -u grafana:change-me \
+curl -X POST http://localhost:5000/api/webhooks/grafana \
+  -u alertbuddy:change-me \
   -H "Content-Type: application/json" \
   -d '{
     "receiver": "alert-buddy",
@@ -301,7 +384,18 @@ alert-buddy-backend/
 │   ├── fcm.ts                # Firebase Cloud Messaging
 │   ├── device-storage.ts     # Device token management
 │   ├── standby-storage.ts    # Standby state management
-│   └── grafana.ts            # Grafana webhook parser
+│   ├── auth.ts               # Firebase ID-token verification + RBAC
+│   ├── tenant.ts             # TENANT_ID + withTenant() write stamp
+│   ├── config-store.ts       # Firestore-backed webhook creds + channel map
+│   ├── config-routes.ts      # Settings → Integrations API (ADMIN)
+│   ├── webhook-auth.ts       # Basic/Bearer/path-token auth for webhooks
+│   ├── webhook-routes.ts     # Grafana/Zabbix gateway routes
+│   ├── alert-routing.ts      # Shared channel matching + severity mapping
+│   ├── alert-dispatch.ts     # Shared dispatch pipeline (standby/broadcast/history)
+│   ├── grafana.ts            # Grafana webhook parser
+│   └── zabbix.ts             # Zabbix webhook parser
+├── docs/
+│   └── zabbix-integration.md # Zabbix media type setup guide
 ├── package.json
 ├── tsconfig.json
 ├── .env.example
@@ -311,12 +405,15 @@ alert-buddy-backend/
 
 ## Alert Routing Logic
 
-1. **Grafana fires alert** → Webhook to `/api/grafana/webhook`
-2. **Backend checks standby status:**
-   - ✅ Someone on standby with token → Send to them
-   - ❌ No one on standby → Broadcast to all devices
-3. **FCM delivers notification** → Android app receives it
-4. **App triggers alert** → User must acknowledge
+1. **Monitoring system fires alert** → webhook to `/api/webhooks/{grafana,zabbix}`
+2. **Source parser** normalises the payload → `ParsedAlert[]` (`alert-routing.ts`)
+3. **`dispatchAlerts()`** (`alert-dispatch.ts`):
+   - `resolved` event → close the matching alert in Firestore, no push
+   - ✅ Someone on standby with token → send to them
+   - ❌ No standby, or their push failed → broadcast to all devices
+   - persist to Firestore history + write an audit-log entry
+4. **FCM delivers notification** → Android app receives it
+5. **App triggers alert** → user must acknowledge
 
 ## Configuration
 

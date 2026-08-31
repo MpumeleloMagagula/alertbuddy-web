@@ -72,6 +72,11 @@ class FirebaseService {
     return auth.currentUser;
   }
 
+  /** Firebase ID token for the signed-in user, or null. Sent as the API bearer token. */
+  async getIdToken(forceRefresh = false): Promise<string | null> {
+    return auth.currentUser ? auth.currentUser.getIdToken(forceRefresh) : null;
+  }
+
   // ========== Security: password + MFA ==========
   async reauthenticate(password: string): Promise<void> {
     const user = auth.currentUser;

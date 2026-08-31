@@ -1,12 +1,15 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Users, UserCheck, Bell, Smartphone, ClipboardList, Settings } from 'lucide-react';
 import logo from '../../assets/alert_buddy.png';
+import { useAuth } from '../../contexts/AuthContext';
 
 
 export default function Sidebar() {
+  const { isAdmin } = useAuth();
+
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/users', icon: Users, label: 'Users' },
+    ...(isAdmin ? [{ to: '/users', icon: Users, label: 'Users' }] : []),
     { to: '/standby', icon: UserCheck, label: 'Standby' },
     { to: '/alerts', icon: Bell, label: 'Alerts' },
     { to: '/devices', icon: Smartphone, label: 'Devices' },

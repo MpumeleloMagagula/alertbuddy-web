@@ -1,4 +1,5 @@
 import admin from 'firebase-admin';
+import { withTenant } from './tenant.js';
 
 export interface StandbyInfo {
   onStandby: boolean;
@@ -89,7 +90,7 @@ export async function updateStandby(
 
   memCache = next;
   if (ready()) {
-    try { await admin.firestore().doc('standby/current').set(next); } catch (err) {
+    try { await admin.firestore().doc('standby/current').set(withTenant(next)); } catch (err) {
       console.error('Failed to persist standby:', err);
     }
   }
@@ -102,7 +103,7 @@ export async function clearStandby(): Promise<StandbyInfo> {
   const cleared: StandbyInfo = { onStandby: false, tokenResolved: false, updatedAt: Date.now() };
   memCache = cleared;
   if (ready()) {
-    try { await admin.firestore().doc('standby/current').set(cleared); } catch {}
+    try { await admin.firestore().doc('standby/current').set(withTenant(cleared)); } catch {}
   }
   return cleared;
 }
@@ -124,7 +125,7 @@ async function logHandover(
       notes,
       pendingAlertsCount: 0,
     };
-    await admin.firestore().collection('handover_logs').doc(log.id).set(log);
+    await admin.firestore().collection('handover_logs').doc(log.id).set(withTenant(log));
     console.log(`📝 Handover logged: ${fromName} → ${toName}`);
   } catch (err) {
     console.error('Failed to log handover:', err);

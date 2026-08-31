@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import firebase from './firebase';
 import type {
   ApiResponse,
   Alert,
@@ -10,6 +11,8 @@ import type {
   User,
   TeamMember,
   Shift,
+  Channel,
+  WebhookConfigView,
 } from '../types';
 
 class ApiService {
@@ -23,10 +26,10 @@ class ApiService {
       },
     });
 
-    // Add request interceptor for auth token
+    // Attach the caller's Firebase ID token to every request.
     this.api.interceptors.request.use(
-      (config) => {
-        const token = localStorage.getItem('authToken');
+      async (config) => {
+        const token = await firebase.getIdToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -34,11 +37,29 @@ class ApiService {
       },
       (error) => Promise.reject(error)
     );
+
+    // On 401, the session is gone — sign out and bounce to login.
+    this.api.interceptors.response.use(
+      (res) => res,
+      async (error) => {
+        if (error?.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
+          try { await firebase.logout(); } catch { /* ignore */ }
+          window.location.assign('/login');
+        }
+        return Promise.reject(error);
+      }
+    );
   }
 
   // ========== Server Status ==========
   async getServerStatus(): Promise<ServerStatus> {
     const { data } = await this.api.get<ServerStatus>('/api/status');
+    return data;
+  }
+
+  // ========== Current user (authoritative role) ==========
+  async getMe(): Promise<{ uid: string; email: string; role: 'ADMIN' | 'MANAGER' | 'USER'; tenantId: string }> {
+    const { data } = await this.api.get('/api/me');
     return data;
   }
 
@@ -116,9 +137,42 @@ class ApiService {
     return data;
   }
 
-  // ========== Grafana Webhook (for testing) ==========
+  // ========== Monitoring Webhooks (for testing) ==========
+  async testWebhook(source: 'grafana' | 'zabbix', payload: any): Promise<ApiResponse> {
+    const { data } = await this.api.post<ApiResponse>('/api/webhooks/test', { source, payload });
+    return data;
+  }
+
+  /** @deprecated use testWebhook('grafana', payload) */
   async sendGrafanaWebhook(payload: any): Promise<ApiResponse> {
-    const { data } = await this.api.post<ApiResponse>('/api/grafana/webhook', payload);
+    return this.testWebhook('grafana', payload);
+  }
+
+  // ========== Integrations config (ADMIN) ==========
+  async getWebhookConfig(): Promise<WebhookConfigView> {
+    const { data } = await this.api.get<WebhookConfigView>('/api/config/webhook');
+    return data;
+  }
+
+  async updateWebhookConfig(patch: {
+    basicUser?: string; basicPassword?: string; bearerToken?: string; regenerateTenantToken?: boolean;
+  }): Promise<WebhookConfigView> {
+    const { data } = await this.api.put<WebhookConfigView>('/api/config/webhook', patch);
+    return data;
+  }
+
+  async getChannels(): Promise<Channel[]> {
+    const { data } = await this.api.get<Channel[]>('/api/config/channels');
+    return data;
+  }
+
+  async saveChannel(channel: Channel): Promise<ApiResponse<{ channel: Channel }>> {
+    const { data } = await this.api.post<ApiResponse<{ channel: Channel }>>('/api/config/channels', channel);
+    return data;
+  }
+
+  async deleteChannel(id: string): Promise<ApiResponse> {
+    const { data } = await this.api.delete<ApiResponse>(`/api/config/channels/${id}`);
     return data;
   }
 

@@ -11,6 +11,8 @@ interface DataPayload {
   channelName: string;
   severity: string;
   source: string;
+  /** Link back to the source UI (Grafana panel, Zabbix event) — optional */
+  url?: string;
 }
 
 let isInitialized = false;
@@ -78,6 +80,7 @@ export async function sendToToken(
         channelName: data.channelName,
         severity: data.severity,
         source: data.source,
+        url: data.url ?? '',
         title: notification.title,
         body: notification.body,
         message: notification.body,
@@ -129,6 +132,7 @@ export async function sendToTopic(
         channelName: data.channelName,
         severity: data.severity,
         source: data.source,
+        url: data.url ?? '',
         title: notification.title,
         body: notification.body,
         message: notification.body,
@@ -179,6 +183,7 @@ export async function sendToMultipleTokens(
       channelName: data.channelName,
       severity: data.severity,
       source: data.source,
+      url: data.url ?? '',
       title: notification.title,
       body: notification.body,
       message: notification.body,

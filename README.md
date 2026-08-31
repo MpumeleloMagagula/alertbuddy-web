@@ -37,6 +37,13 @@ npm run dev
 
 4. Make sure your backend server is running on port 5000
 
+## Auth, tenancy & rollout
+
+The backend API requires a Firebase ID token and enforces roles; Firestore
+security rules live in `firestore.rules` (repo root, deployed separately with
+`firebase deploy --only firestore`). Before testing or deploying per client,
+read **[backend/README.md → Rollout / testing checklist](backend/README.md#rollout--testing-checklist)**.
+
 ## Project Structure
 
 ```
